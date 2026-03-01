@@ -1,0 +1,60 @@
+# =============================================================================
+# OpenDDIL Stack — Cursor Rules
+# =============================================================================
+# Enforces coding styles and tech stack conventions for AI coding assistants.
+# =============================================================================
+
+# Project Identity
+You are working in the openddil-stack repository — the central HQ infrastructure
+for the OpenDDIL DDIL-resilient CQRS framework.
+
+# Tech Stack (DO NOT deviate without explicit approval)
+- Database: PostgreSQL 16+ (always wal_level=logical)
+- Schema Management: Atlas (declarative HCL, NOT imperative SQL migrations)
+- Message Bus: Redpanda (Kafka-compatible API, NOT Apache Kafka)
+- Event Processor: Restate (durable, exactly-once handlers)
+- Read-Path Sync: ElectricSQL (HTTP Shape API, NOT legacy ELECTRIC ENABLE DDL)
+- Contracts: Protobufs (defined in openddil-contracts, NOT in this repo)
+- Infrastructure: Docker Compose (for local dev)
+
+# Schema Rules
+- All schema changes MUST be made in schema/schema.hcl using Atlas HCL syntax.
+- NEVER write raw ALTER TABLE / CREATE TABLE SQL for schema evolution.
+- ALWAYS follow Expand/Contract migration pattern:
+  1. Expand: Add new columns/tables (backward-compatible).
+  2. Deploy: Update processors and SDKs.
+  3. Contract: Remove old columns/tables after migration.
+- All tables MUST use UUID primary keys with gen_random_uuid() default.
+- All tables MUST include created_at and updated_at timestamptz columns.
+- Use snake_case for all table and column names.
+
+# Docker Compose Rules
+- All services MUST be on the openddil-net bridge network.
+- All long-running services MUST have health checks.
+- All services depending on another MUST use depends_on with condition: service_healthy.
+- Init containers (like atlas-init) use restart: "no".
+- Long-running services use restart: unless-stopped.
+- Use named volumes for data persistence, never bind mounts for data.
+
+# ElectricSQL Rules
+- ElectricSQL is READ-PATH ONLY. Writes go through Outbox → Redpanda → Restate.
+- Only tables intended for Edge sync should be in the PUBLICATION.
+- audit_log and other HQ-internal tables must NEVER be published to Edge.
+- Use the Shape API (GET /v1/shape?table=...) for client sync configuration.
+
+# Naming Conventions
+- Docker container names: openddil-{service-name}
+- Docker volume names: {service}_data
+- Network: openddil-net
+- Database name, user, password (dev only): openddil
+
+# File Conventions
+- YAML: 2-space indent
+- HCL: 2-space indent
+- SQL: UPPERCASE keywords, lowercase identifiers
+- Comments: Block header comments with === dividers for major sections
+
+# Security Notes (Dev Environment)
+- ELECTRIC_INSECURE=true is acceptable for local dev ONLY.
+- Default credentials (openddil/openddil) are for local dev ONLY.
+- Never commit production secrets to this repository.

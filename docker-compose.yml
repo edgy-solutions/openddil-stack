@@ -1,0 +1,189 @@
+# =============================================================================
+# OpenDDIL Stack — Central HQ Infrastructure
+# =============================================================================
+# Brings up the full backend: Postgres, Atlas schema init, Redpanda (Kafka),
+# Restate (durable processor), and ElectricSQL (read-path sync).
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f atlas-init   # watch schema bootstrap
+#   docker compose down -v              # tear down + delete volumes
+# =============================================================================
+
+name: openddil
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — Central Source-of-Truth
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: openddil-postgres
+    environment:
+      POSTGRES_USER: openddil
+      POSTGRES_PASSWORD: openddil
+      POSTGRES_DB: openddil
+    # Enable logical replication for ElectricSQL
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - openddil-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openddil -d openddil"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Atlas — Declarative Schema Init (one-shot)
+  # ---------------------------------------------------------------------------
+  # Applies the desired-state schema to Postgres on startup, then exits.
+  # Re-run with:  docker compose run --rm atlas-init
+  atlas-init:
+    image: arigaio/atlas:latest
+    container_name: openddil-atlas-init
+    command: >
+      schema apply
+        --url "postgres://openddil:openddil@postgres:5432/openddil?sslmode=disable"
+        --to "file://schema/schema.hcl"
+        --dev-url "sqlite://dev?mode=memory"
+        --auto-approve
+    volumes:
+      - ./schema:/schema
+    networks:
+      - openddil-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # Redpanda — Kafka-Compatible Message Bus
+  # ---------------------------------------------------------------------------
+  redpanda:
+    image: redpanda-data/redpanda:latest
+    container_name: openddil-redpanda
+    command:
+      - redpanda
+      - start
+      - --mode
+      - dev-container
+      - --smp
+      - "1"
+      - --memory
+      - 512M
+      - --reserve-memory
+      - 0M
+      - --overprovisioned
+      - --kafka-addr
+      - "internal://0.0.0.0:29092,external://0.0.0.0:9092"
+      - --advertise-kafka-addr
+      - "internal://redpanda:29092,external://localhost:9092"
+      - --pandaproxy-addr
+      - "internal://0.0.0.0:8082,external://0.0.0.0:18082"
+      - --advertise-pandaproxy-addr
+      - "internal://redpanda:8082,external://localhost:18082"
+      - --schema-registry-addr
+      - "internal://0.0.0.0:8081,external://0.0.0.0:18081"
+      - --advertise-schema-registry-addr
+      - "internal://redpanda:8081,external://localhost:18081"
+    ports:
+      - "9092:9092"       # Kafka API (external)
+      - "18081:18081"     # Schema Registry (external)
+      - "18082:18082"     # Pandaproxy / HTTP Proxy (external)
+      - "9644:9644"       # Admin API
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    networks:
+      - openddil-net
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Redpanda Console — Web UI for Redpanda
+  # ---------------------------------------------------------------------------
+  redpanda-console:
+    image: redpanda-data/console:latest
+    container_name: openddil-redpanda-console
+    environment:
+      CONFIG_FILEPATH: ""
+      KAFKA_BROKERS: "redpanda:29092"
+      KAFKA_SCHEMAREGISTRY_ENABLED: "true"
+      KAFKA_SCHEMAREGISTRY_URLS: "http://redpanda:8081"
+      REDPANDA_ADMINAPI_ENABLED: "true"
+      REDPANDA_ADMINAPI_URLS: "http://redpanda:9644"
+    ports:
+      - "8180:8080"
+    networks:
+      - openddil-net
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Restate — Durable Event Processor (exactly-once)
+  # ---------------------------------------------------------------------------
+  restate:
+    image: restatedev/restate:latest
+    container_name: openddil-restate
+    ports:
+      - "8080:8080"       # Ingress (send invocations here)
+      - "9070:9070"       # Admin API (register deployments here)
+    volumes:
+      - restate_data:/target/restate-data
+    networks:
+      - openddil-net
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # ElectricSQL — Read-Path Sync (Postgres → Edge SQLite)
+  # ---------------------------------------------------------------------------
+  # Exposes an HTTP Shape API that Edge clients subscribe to for partial
+  # replication of Postgres tables into a local SQLite read-cache.
+  electric:
+    image: electricsql/electric:latest
+    container_name: openddil-electric
+    environment:
+      DATABASE_URL: "postgresql://openddil:openddil@postgres:5432/openddil?sslmode=disable"
+      ELECTRIC_INSECURE: "true"   # Dev only — disable in production
+    ports:
+      - "3000:3000"       # Shape API
+    networks:
+      - openddil-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redpanda_data:
+    driver: local
+  restate_data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  openddil-net:
+    driver: bridge

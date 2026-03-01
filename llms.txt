@@ -1,0 +1,52 @@
+# OpenDDIL Stack — llms.txt
+# https://llmstxt.org/
+# This file helps AI coding assistants understand the project.
+
+> OpenDDIL Stack is the central HQ infrastructure repository for the OpenDDIL framework.
+> It provides a Docker Compose environment running PostgreSQL, Redpanda, Restate, and ElectricSQL.
+> Schema is managed declaratively with Atlas (HCL). No hand-written migrations.
+
+## Project Purpose
+OpenDDIL is a CQRS, Event-Driven architecture for DDIL (Denied, Degraded, Intermittent, Limited) environments.
+It replaces legacy database replication with durable, intent-based sync.
+
+## Architecture
+- Read Path: ElectricSQL syncs Postgres → local SQLite read-cache on Edge nodes.
+- Write Path: Edge nodes spool events to a local SQLite Outbox, flush to Redpanda when connected.
+- Processing: Restate consumes events from Redpanda and applies them to Postgres (exactly-once).
+- Contracts: Protobufs for payload compression and cross-language support (see openddil-contracts repo).
+
+## Key Files
+- docker-compose.yml: Orchestrates all HQ services (Postgres, Atlas init, Redpanda, Restate, ElectricSQL).
+- schema/schema.hcl: Atlas declarative schema defining inventory_items and audit_log tables.
+- electric/electrify.sql: PostgreSQL PUBLICATION + REPLICATION config for ElectricSQL Shape API.
+- README.md: Quick-start guide, service endpoints, Expand/Contract migration docs.
+- AGENTS.md: AI agent workflow guidelines and safety constraints.
+- .cursorrules: Coding style and tech stack conventions for AI assistants.
+
+## Tech Stack
+- PostgreSQL 16 (wal_level=logical)
+- Atlas (arigaio/atlas) — declarative schema-as-code
+- Redpanda (Kafka-compatible, no Zookeeper)
+- Restate (durable, exactly-once event processing)
+- ElectricSQL (read-path sync via HTTP Shape API)
+- Protobufs (event contract serialization, defined in openddil-contracts)
+- Docker Compose
+
+## Polyrepo Structure
+- openddil-stack (this repo): Docker Compose, Atlas schemas, server infra.
+- openddil-contracts: Language-agnostic Protobuf schemas.
+- openddil-edge-dotnet: .NET Edge SDK (Outbox + Relay).
+- openddil-edge-python: Python Edge SDK (Outbox + Relay).
+- openddil-hq-dotnet: .NET HQ SDK (Restate handlers).
+- openddil-hq-python: Python HQ SDK (Restate handlers).
+
+## Schema Evolution Rules
+1. EXPAND: Add new columns/tables. Old consumers still work. Deploy the schema first.
+2. DEPLOY: Update HQ processors and Edge SDKs to use the new fields.
+3. CONTRACT: Remove old columns/tables only after all consumers have migrated.
+
+## ElectricSQL Notes
+- Modern ElectricSQL (v0.9+) is read-path only. No ELECTRIC ENABLE DDL.
+- Tables are exposed via HTTP Shape API: GET /v1/shape?table=inventory_items&offset=-1
+- Only inventory_items is published. audit_log is HQ-only (not synced to Edge).
