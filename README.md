@@ -100,6 +100,7 @@ openddil-stack/          ← You are here
 openddil-contracts/      ← Protobuf event schemas
 openddil-edge-dotnet/    ← .NET Edge SDK (Outbox + Relay)
 openddil-edge-python/    ← Python Edge SDK (Outbox + Relay)
-openddil-hq-dotnet/      ← .NET HQ SDK (Restate handlers)
-openddil-hq-python/      ← Python HQ SDK (Restate handlers)
+openddil-hq/             ← Python HQ SDK (Restate exactly-once processor)
+openddil-regional-stack/ ← Regional Hub infrastructure (Redpanda Connect bridge)
+openddil-sensor-ingest/  ← Sensor Ingestion Gateway & Legacy Bridge (Phase 7.1)
 ```
