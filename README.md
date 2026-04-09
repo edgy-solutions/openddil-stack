@@ -57,6 +57,17 @@ docker compose exec postgres psql -U openddil -d openddil -f /electric/electrify
 docker compose down -v
 ```
 
+## Kubernetes Deployment
+
+While `docker compose` is used for local development and testing, **Helm** is the standard for multi-cluster staging and production deployments.
+
+The unified Helm chart for deploying the OpenDDIL node infrastructure is located at `helm/openddil-node/`. This chart manages the deployment of our services (like the Restate Projector) and automatically applies schema contracts via init containers.
+
+```bash
+# Install or upgrade the OpenDDIL node via Helm
+helm upgrade openddil ./helm/openddil-node -n openddil-namespace --install
+```
+
 ## Service Endpoints
 
 | Service | URL | Purpose |
@@ -113,7 +124,7 @@ Each repo in the OpenDDIL polyrepo includes these files for AI assistant context
 ## Repository Structure
 
 ```
-openddil-stack/          ← You are here
+openddil-stack/          ← You are here (HQ infra & unified Helm chart at helm/openddil-node/)
 openddil-contracts/      ← Protobuf event schemas
 openddil-edge-dotnet/    ← .NET Edge SDK (Outbox + Relay)
 openddil-edge-python/    ← Python Edge SDK (Outbox + Relay)
