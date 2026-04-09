@@ -1,0 +1,44 @@
+{{- if .Values.services.restateProjector.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-restate-projector
+  labels:
+    app: restate-projector
+spec:
+  replicas: {{ .Values.services.restateProjector.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: restate-projector
+  template:
+    metadata:
+      labels:
+        app: restate-projector
+    spec:
+      initContainers:
+        - name: atlas-schema-apply
+          image: arigaio/atlas:latest
+          command:
+            - atlas
+            - schema
+            - apply
+            - -u
+            - "{{ .Values.global.postgresql.url }}"
+            - --to
+            - file:///etc/atlas/schema.hcl
+            - --auto-approve
+          volumeMounts:
+            - name: atlas-config
+              mountPath: /etc/atlas
+      containers:
+        - name: restate-projector
+          image: "{{ .Values.services.restateProjector.image.repository }}:{{ .Values.services.restateProjector.image.tag }}"
+          imagePullPolicy: {{ .Values.services.restateProjector.image.pullPolicy | default "IfNotPresent" }}
+          env:
+            - name: POSTGRES_URL
+              value: "{{ .Values.global.postgresql.url }}"
+      volumes:
+        - name: atlas-config
+          configMap:
+            name: {{ .Values.services.restateProjector.atlas.hclConfigMap }}
+{{- end }}
