@@ -22,6 +22,23 @@ graph LR
     OB -- flush --> RP -- consume --> RS -- exactly-once apply --> PG
 ```
 
+## Phase 7: The Tactical Sensor Pipeline (Edge Compute)
+
+OpenDDIL is no longer just a UI-to-Database synchronization tool; it is an **Autonomous Tactical Awareness** platform. 
+
+In a DDIL environment, we cannot wait for sensor data to travel to Central Command for processing. We process it at the Edge using the **OpenDDIL Gateway Tier** (formerly the Regional Hub).
+
+### The Standardized Data Flow
+1. **Ingestion (`openddil-sensor-ingest`):** We ingest raw telemetry from diverse sources (RTI DDS, RabbitMQ). 
+2. **Standardization (CloudEvents):** Before hitting our event bus, all sensor data is wrapped in a strict [CloudEvents](https://cloudevents.io/) JSON envelope. This ensures our agents can route and process data by `device_id` and `event_type` without writing custom parsers for every new hardware sensor.
+3. **Local Pattern Detection (`openddil-tactical-agents`):** 
+    * **Faust Agents** handle high-speed, stateless math (e.g., tumbling window averages).
+    * **Restate Agents** handle complex, long-running stateful workflows (e.g., waiting 45 seconds for a reconnection event).
+4. **The Local UI Projector:** Detected anomalies are projected into a local SQLite/Postgres read-model, allowing Edge operators to see threats instantly via ElectricSQL, even if the HQ uplink is severed.
+
+### The "Strangler Fig" Transition (Demo Architecture)
+To ensure operational continuity, we are currently running a **Parallel Data Bridge**. A `redpanda-connect` instance uses a `fan_out` pattern to send tactical events *up* to Central Command, while simultaneously sending a copy *across* to our legacy RabbitMQ/GraphQL UI. This allows us to prove the new OpenDDIL brains while keeping the existing UI functional until it is fully replaced.
+
 ## Quick Start
 
 ```bash
@@ -103,4 +120,5 @@ openddil-edge-python/    ← Python Edge SDK (Outbox + Relay)
 openddil-hq/             ← Python HQ SDK (Restate exactly-once processor)
 openddil-regional-stack/ ← Regional Hub infrastructure (Redpanda Connect bridge)
 openddil-sensor-ingest/  ← Sensor Ingestion Gateway & Legacy Bridge (Phase 7.1)
+openddil-tactical-agents/← Faust Autonomous Agents & Local Read Projector (Phase 7.2)
 ```

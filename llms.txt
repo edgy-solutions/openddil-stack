@@ -41,6 +41,7 @@ It replaces legacy database replication with durable, intent-based sync.
 - openddil-hq-dotnet: .NET HQ SDK (Restate handlers).
 - openddil-hq-python: Python HQ SDK (Restate handlers).
 - openddil-sensor-ingest: Sensor Ingestion Gateway & Legacy Bridge (Phase 7.1).
+- openddil-tactical-agents: Faust Autonomous Agents & Local Read Projector (Phase 7.2).
 
 ## Schema Evolution Rules
 1. EXPAND: Add new columns/tables. Old consumers still work. Deploy the schema first.

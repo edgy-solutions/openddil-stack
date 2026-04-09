@@ -22,7 +22,7 @@ This repo contains **infrastructure only** — Docker Compose, Atlas schema defi
 - ❌ **Never remove the `wal_level=logical` Postgres setting**. ElectricSQL requires logical replication.
 - ❌ **Never commit production credentials**. Use environment variables or secrets management.
 - ❌ **Never run `docker compose down -v` without user confirmation**. This destroys all data volumes.
-- ❌ **Never modify files in sibling repos** (`openddil-contracts`, `openddil-edge-*`, `openddil-hq-*`, `openddil-sensor-ingest`) from this repo's context. Each repo has its own agent guidelines.
+- ❌ **Never modify files in sibling repos** (`openddil-contracts`, `openddil-edge-*`, `openddil-hq-*`, `openddil-sensor-ingest`, `openddil-tactical-agents`) from this repo's context. Each repo has its own agent guidelines.
 
 ## Schema Change Workflow
 
