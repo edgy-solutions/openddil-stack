@@ -6,20 +6,25 @@ Central HQ infrastructure for the OpenDDIL framework — a CQRS, Event-Driven ar
 
 ```mermaid
 graph LR
-    subgraph Edge Node
+    subgraph Edge Compute
+        SI["Sensor Ingest\n(DDS/RabbitMQ)"]
+        FA["Faust/Restate\n(Tactical Agents)"]
         RC["SQLite\n(read cache)"]
         OB["SQLite\n(outbox)"]
     end
 
-    subgraph HQ ["HQ (this repo)"]
-        PG["PostgreSQL\n(source of truth)"]
-        RS["Restate\n(durable processor)"]
-        RP["Redpanda\n(Kafka-compat bus)"]
+    subgraph OpenDDIL Node ["OpenDDIL Node (HQ / Regional Hub)"]
+        RP["Redpanda\n(Event Bus)"]
+        RS["Restate\n(Durable Workflows)"]
+        PG["PostgreSQL\n(State / Projections)"]
         EL["ElectricSQL\n(Shape API)"]
     end
 
-    PG -- sync --> EL -- read-path --> RC
-    OB -- flush --> RP -- consume --> RS -- exactly-once apply --> PG
+    SI -- "raw-sensor-stream\n(Protobuf)" --> RP
+    RP -- "consume" --> FA -- "tactical-events\n(Protobuf)" --> RP
+    RP -- "consume" --> RS -- "exactly-once\napply" --> PG
+    PG -- "sync" --> EL -- "read-path" --> RC
+    OB -- "flush" --> RP
 ```
 
 ## Phase 7: The Tactical Sensor Pipeline (Edge Compute)
