@@ -487,3 +487,60 @@ table "asset_telemetry_windows" {
     columns = [column.asset_id]
   }
 }
+
+# -----------------------------------------------------------------------------
+# Phase 4c.5: edge->HQ DDIL link / buffer status
+# -----------------------------------------------------------------------------
+# Singleton row (id = 'edge') describing the real edge->HQ bridge state:
+# the `bridge-group` consumer-group lag on redpanda-edge (the genuine
+# edge-buffer depth — messages queued at the edge because the HQ link is
+# severed) and whether the toxiproxy hq-link proxy currently has a timeout
+# toxic applied. Written by the openddil-projector's edge-buffer monitor
+# task; exposed to the UI via ElectricSQL so the buffer/link widgets show
+# a real, honestly-backed number instead of a client-side simulation.
+# -----------------------------------------------------------------------------
+table "edge_buffer_status" {
+  schema = schema.public
+
+  column "id" {
+    type = text
+    null = false
+  }
+
+  # Sum of `bridge-group` consumer-group lag across redpanda-edge
+  # partitions of raw-sensor-stream + tactical-events. The real
+  # edge-buffer depth: climbs when the HQ link is severed and the bridge
+  # cannot drain, falls when the link is restored.
+  column "bridge_group_lag" {
+    type    = bigint
+    null    = false
+    default = 0
+  }
+
+  # True when the toxiproxy hq-link proxy has a timeout toxic applied
+  # (the WAN is "severed").
+  column "hq_link_severed" {
+    type    = boolean
+    null    = false
+    default = false
+  }
+
+  # Whether the projector's monitor could actually reach Kafka + toxiproxy
+  # to compute the above. False => the widgets should show "probe down"
+  # rather than a stale number presenting as real.
+  column "probe_healthy" {
+    type    = boolean
+    null    = false
+    default = false
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.id]
+  }
+}
