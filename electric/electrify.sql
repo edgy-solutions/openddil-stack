@@ -18,20 +18,49 @@
 -- -----------------------------------------------------------------------------
 -- 1. Publication — Controls which tables ElectricSQL replicates
 -- -----------------------------------------------------------------------------
--- Only inventory_items is exposed to Edge clients. The audit_log is HQ-only
--- and should NOT be synced to untrusted Edge nodes.
+-- Tables exposed to Edge clients:
+--   * inventory_items           — FOB inventory (Phase 0)
+--   * asset_cm_state            — per-asset CM state (Phase 4a)
+--   * asset_logistics_status    — per-asset logistics severity (Phase 4a)
+--   * telemetry_latest_state    — per-asset latest telemetry snapshot (Phase 4a)
+--   * tactical_events           — CloudEvents alert log (Phase 4a)
+--   * asset_telemetry_windows   — per-asset windowed aggregations (Phase 4a)
+--
+-- audit_log is HQ-only and is intentionally NOT included.
 -- -----------------------------------------------------------------------------
-CREATE PUBLICATION IF NOT EXISTS electric_publication
-  FOR TABLE public.inventory_items;
+-- Postgres has no `CREATE PUBLICATION IF NOT EXISTS`; guard with a DO block
+-- so this file is safely re-runnable (atlas-init / electric-publish-init run
+-- it on every stack bring-up).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication WHERE pubname = 'electric_publication'
+  ) THEN
+    CREATE PUBLICATION electric_publication
+      FOR TABLE public.inventory_items,
+                public.asset_cm_state,
+                public.asset_logistics_status,
+                public.telemetry_latest_state,
+                public.tactical_events,
+                public.asset_telemetry_windows;
+  END IF;
+END
+$$;
 
 -- -----------------------------------------------------------------------------
 -- 2. Replication Role — Required for ElectricSQL's logical replication
 -- -----------------------------------------------------------------------------
--- The openddil user needs the REPLICATION attribute to create replication
--- slots. In containerized Postgres, the superuser already has this, but we
--- set it explicitly for clarity and for non-superuser deployments.
+-- The application user needs the REPLICATION attribute to create replication
+-- slots. Run conditionally so this file works both in openddil-stack (user
+-- `openddil`) and openddil-demo (user `postgres`, already superuser).
 -- -----------------------------------------------------------------------------
-ALTER ROLE openddil WITH REPLICATION;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'openddil') THEN
+    ALTER ROLE openddil WITH REPLICATION;
+  END IF;
+END
+$$;
 
 -- =============================================================================
 -- Edge Client Usage (for reference — not executed here)

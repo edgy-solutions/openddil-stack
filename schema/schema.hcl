@@ -120,3 +120,370 @@ table "audit_log" {
     columns = [column.entity_type, column.entity_id]
   }
 }
+
+# -----------------------------------------------------------------------------
+# Phase 4a: Kafka-projected read tables
+# -----------------------------------------------------------------------------
+# Each table below is populated by the openddil-projector service consuming
+# one Kafka topic. Compacted topics map to UPSERT-by-PK tables; the
+# tactical_events stream maps to an append-only log with TTL pruning.
+#
+# Nested Protobuf structures are persisted as JSONB blobs rather than
+# flattened. The UI consumes them via ElectricSQL shapes and accesses fields
+# via JSONB path expressions. Adding new nested fields does not require a
+# migration.
+# -----------------------------------------------------------------------------
+
+# Per-asset CM state. Source: topic `asset-cm-state`, compacted, keyed by asset_id.
+# Producer: openddil-cm-service (AssetCM Virtual Object).
+table "asset_cm_state" {
+  schema = schema.public
+
+  column "asset_id" {
+    type = text
+    null = false
+  }
+
+  column "baseline_id" {
+    type = text
+    null = true
+  }
+
+  column "lifecycle" {
+    type    = text
+    null    = false
+    default = "LIFECYCLE_UNSPECIFIED"
+  }
+
+  column "overall_status" {
+    type    = text
+    null    = false
+    default = "CONFIG_STATUS_UNSPECIFIED"
+  }
+
+  column "last_alerted_status" {
+    type = text
+    null = true
+  }
+
+  column "as_of" {
+    type = timestamptz
+    null = true
+  }
+
+  column "last_observed_at" {
+    type = timestamptz
+    null = true
+  }
+
+  column "installed" {
+    type    = jsonb
+    null    = false
+    default = "[]"
+  }
+
+  column "mod_status" {
+    type    = jsonb
+    null    = false
+    default = "[]"
+  }
+
+  column "discrepancies" {
+    type    = jsonb
+    null    = false
+    default = "[]"
+  }
+
+  # cm-service keeps analyzer-rebuilt `discrepancies` and human-raised
+  # `manual_discrepancies` in separate lists (ADR-0009 addendum) — the
+  # projector preserves that separation so the UI can too.
+  column "manual_discrepancies" {
+    type    = jsonb
+    null    = false
+    default = "[]"
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.asset_id]
+  }
+}
+
+# Per-asset logistics severity. Source: topic `asset-logistics-status`, compacted.
+# Producer: openddil-logistics-fusion-service.
+# AssetLogisticsStatusUpdate envelope is unwrapped by the projector — the status
+# fields land here, and the envelope flags (is_transition, is_initial,
+# previous_severity) are preserved alongside.
+table "asset_logistics_status" {
+  schema = schema.public
+
+  column "asset_id" {
+    type = text
+    null = false
+  }
+
+  column "platform_variant" {
+    type = text
+    null = true
+  }
+
+  column "overall_severity" {
+    type    = text
+    null    = false
+    default = "LOGISTICS_SEVERITY_UNSPECIFIED"
+  }
+
+  column "previous_severity" {
+    type = text
+    null = true
+  }
+
+  column "constraining_factors" {
+    type    = jsonb
+    null    = false
+    default = "[]"
+  }
+
+  column "projected_mission_capable_remaining_seconds" {
+    type = integer
+    null = true
+  }
+
+  column "projected_time_to_next_constraint_seconds" {
+    type = integer
+    null = true
+  }
+
+  column "cm_baseline_id" {
+    type = text
+    null = true
+  }
+
+  column "status_revision" {
+    type    = bigint
+    null    = false
+    default = 0
+  }
+
+  column "computed_at" {
+    type = timestamptz
+    null = true
+  }
+
+  column "latest_telemetry_sample_time" {
+    type = timestamptz
+    null = true
+  }
+
+  column "is_transition" {
+    type    = boolean
+    null    = false
+    default = false
+  }
+
+  column "is_initial" {
+    type    = boolean
+    null    = false
+    default = false
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.asset_id]
+  }
+}
+
+# Per-asset latest telemetry snapshot. Source: topic `telemetry-latest-state`,
+# compacted. Producer: faust-edge (openddil-tactical-agents).
+table "telemetry_latest_state" {
+  schema = schema.public
+
+  column "asset_id" {
+    type = text
+    null = false
+  }
+
+  column "platform_variant" {
+    type = text
+    null = true
+  }
+
+  column "callsign" {
+    type = text
+    null = true
+  }
+
+  column "force_id" {
+    type = text
+    null = true
+  }
+
+  column "kinematics" {
+    type = jsonb
+    null = true
+  }
+
+  column "sustainment" {
+    type = jsonb
+    null = true
+  }
+
+  column "provenance" {
+    type    = jsonb
+    null    = false
+    default = "{}"
+  }
+
+  column "last_sample_at" {
+    type = timestamptz
+    null = true
+  }
+
+  column "schema_revision" {
+    type    = integer
+    null    = false
+    default = 0
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.asset_id]
+  }
+}
+
+# Append-only CloudEvents log. Source: topic `tactical-events`. Producers:
+# openddil-cm-service (config alerts), openddil-logistics-fusion-service
+# (logistics-CRITICAL transitions). Retained 24h by a projector-side pruner.
+table "tactical_events" {
+  schema = schema.public
+
+  column "id" {
+    type = text
+    null = false
+  }
+
+  column "source" {
+    type = text
+    null = false
+  }
+
+  column "type" {
+    type = text
+    null = false
+  }
+
+  column "subject" {
+    type = text
+    null = false
+  }
+
+  column "severity" {
+    type = text
+    null = true
+  }
+
+  column "time" {
+    type = timestamptz
+    null = false
+  }
+
+  column "data" {
+    type    = jsonb
+    null    = false
+    default = "{}"
+  }
+
+  column "ingested_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.id]
+  }
+
+  index "idx_tactical_events_time" {
+    columns = [column.time]
+  }
+
+  index "idx_tactical_events_subject_time" {
+    columns = [column.subject, column.time]
+  }
+}
+
+# Per-asset rolling-window aggregations. Source: topic `asset-telemetry-windows`,
+# compacted. Producer: faust-edge windowing agent. JSONB blobs match the
+# WindowedTelemetry proto structure (fluid_trends[], consumable_trends[],
+# component_wear_trends[]).
+table "asset_telemetry_windows" {
+  schema = schema.public
+
+  column "asset_id" {
+    type = text
+    null = false
+  }
+
+  column "platform_variant" {
+    type = text
+    null = true
+  }
+
+  column "fluid_trends" {
+    type    = jsonb
+    null    = false
+    default = "[]"
+  }
+
+  column "consumable_trends" {
+    type    = jsonb
+    null    = false
+    default = "[]"
+  }
+
+  column "component_wear_trends" {
+    type    = jsonb
+    null    = false
+    default = "[]"
+  }
+
+  column "window_duration_seconds" {
+    type = integer
+    null = true
+  }
+
+  column "sample_count" {
+    type = integer
+    null = true
+  }
+
+  column "computed_at" {
+    type = timestamptz
+    null = true
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.asset_id]
+  }
+}
