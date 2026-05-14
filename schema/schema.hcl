@@ -144,6 +144,26 @@ table "asset_cm_state" {
     null = false
   }
 
+  # Origin-node provenance (ADR-0022). OpenDDIL is hierarchical streaming
+  # aggregation — edge -> regional -> HQ. The current topology is collapsed
+  # to a single flat tier, so these carry constant defaults today, but every
+  # per-asset projection row is shaped for the hierarchy from the start:
+  # retrofitting an echelon dimension after shapes, rollups, and egress
+  # bridges already exist is the expensive path (the Quantity-everywhere
+  # lesson from Phase 2.5 — get the schema shape right during the build phase
+  # even when the values are trivial). Present on all five per-asset tables.
+  column "edge_id" {
+    type    = text
+    null    = false
+    default = "edge-01"
+  }
+
+  column "region_id" {
+    type    = text
+    null    = false
+    default = "region-01"
+  }
+
   column "baseline_id" {
     type = text
     null = true
@@ -225,6 +245,19 @@ table "asset_logistics_status" {
   column "asset_id" {
     type = text
     null = false
+  }
+
+  # Origin-node provenance — see ADR-0022.
+  column "edge_id" {
+    type    = text
+    null    = false
+    default = "edge-01"
+  }
+
+  column "region_id" {
+    type    = text
+    null    = false
+    default = "region-01"
   }
 
   column "platform_variant" {
@@ -313,6 +346,21 @@ table "telemetry_latest_state" {
     null = false
   }
 
+  # Origin-node provenance — see ADR-0022. Distinct from the free-form
+  # `provenance` jsonb below (producer_id / source_protocol / sample_time):
+  # these two are the structured, filterable echelon dimension.
+  column "edge_id" {
+    type    = text
+    null    = false
+    default = "edge-01"
+  }
+
+  column "region_id" {
+    type    = text
+    null    = false
+    default = "region-01"
+  }
+
   column "platform_variant" {
     type = text
     null = true
@@ -377,6 +425,20 @@ table "tactical_events" {
     null = false
   }
 
+  # Origin-node provenance — see ADR-0022. The echelon an event originated
+  # at; `subject` carries the asset_id by OpenDDIL convention.
+  column "edge_id" {
+    type    = text
+    null    = false
+    default = "edge-01"
+  }
+
+  column "region_id" {
+    type    = text
+    null    = false
+    default = "region-01"
+  }
+
   column "source" {
     type = text
     null = false
@@ -437,6 +499,19 @@ table "asset_telemetry_windows" {
   column "asset_id" {
     type = text
     null = false
+  }
+
+  # Origin-node provenance — see ADR-0022.
+  column "edge_id" {
+    type    = text
+    null    = false
+    default = "edge-01"
+  }
+
+  column "region_id" {
+    type    = text
+    null    = false
+    default = "region-01"
   }
 
   column "platform_variant" {
