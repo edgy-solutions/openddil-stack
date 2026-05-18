@@ -64,6 +64,26 @@ BEGIN
 END
 $$;
 
+-- Phase 6b §B (ADR-0023): regional rollups (region_fleet_summary,
+-- region_top_factors, region_wear_trends). Same idempotent ALTER pattern;
+-- exposes the three to ElectricSQL Shapes so the REGION FLEET SUMMARY
+-- panel can read them live.
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['region_fleet_summary', 'region_top_factors', 'region_wear_trends']
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'electric_publication' AND tablename = t
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION electric_publication ADD TABLE public.%I', t);
+    END IF;
+  END LOOP;
+END
+$$;
+
 -- -----------------------------------------------------------------------------
 -- 2. Replication Role — Required for ElectricSQL's logical replication
 -- -----------------------------------------------------------------------------
