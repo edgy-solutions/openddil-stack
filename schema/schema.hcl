@@ -619,3 +619,158 @@ table "edge_buffer_status" {
     columns = [column.id]
   }
 }
+
+# -----------------------------------------------------------------------------
+# Phase 6b §B: regional rollups (ADR-0023)
+# -----------------------------------------------------------------------------
+# Three per-region aggregate tables populated by the openddil-projector's new
+# region_* handler modules consuming faust-regional's three rolled-up topics
+# on redpanda-hq. Each table is keyed by region_id alone — rollups are
+# region-level, not per-asset. Wide-JSONB shape for variable-length payloads
+# (top-factors, wear-trends components); narrow-column shape for the fixed-
+# severity-bucket fleet summary. Row count stays tiny (≤ a handful of
+# regions per deployment); ElectricSQL Shapes against region_id stay simple
+# for §C.
+#
+# All three CREATE TABLEs land in one logical schema change: the regional
+# rollup tier is one architectural unit (the §B observable claim), so
+# Atlas computes one migration for the trio.
+# -----------------------------------------------------------------------------
+
+# region-fleet-summary — per-region severity counts. Headline rollup.
+# Producer: faust-regional aggregator App. Compaction key: region_id.
+table "region_fleet_summary" {
+  schema = schema.public
+
+  column "region_id" {
+    type = text
+    null = false
+  }
+
+  # Severity buckets. The aggregator computes per-asset bucket assignment
+  # as the WORST of logistics severity and cm-state derived severity, then
+  # counts. asset_count is the sum so the UI can render "X of N nominal"
+  # without computing it client-side.
+  column "nominal" {
+    type    = integer
+    null    = false
+    default = 0
+  }
+  column "degraded" {
+    type    = integer
+    null    = false
+    default = 0
+  }
+  column "critical" {
+    type    = integer
+    null    = false
+    default = 0
+  }
+  column "non_operational" {
+    type    = integer
+    null    = false
+    default = 0
+  }
+  column "asset_count" {
+    type    = integer
+    null    = false
+    default = 0
+  }
+
+  column "observed_at" {
+    type = timestamptz
+    null = true
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.region_id]
+  }
+}
+
+# region-top-factors — per-region top-N constraining factors by frequency.
+# Producer: faust-regional aggregator. Wide-JSONB column for the factors
+# array because N is variable (default 10 but tunable) and the per-factor
+# severity_breakdown map is itself variable-length. UI consumes the JSON
+# directly to render the stacked-bar per factor.
+table "region_top_factors" {
+  schema = schema.public
+
+  column "region_id" {
+    type = text
+    null = false
+  }
+
+  # JSON array shape: [{factor_id, count, severity_breakdown: {LEVEL: count}}].
+  # Sorted DESC by count. Empty under cold start — projector handler does NOT
+  # write a row until faust-regional has emitted at least once; UI cold-
+  # state renders "Awaiting first emission..." in that gap.
+  column "factors" {
+    type    = jsonb
+    null    = false
+    default = "[]"
+  }
+
+  column "observed_at" {
+    type = timestamptz
+    null = true
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.region_id]
+  }
+}
+
+# region-wear-trends — per-region aggregate wear by component.
+# Producer: faust-regional aggregator. JSONB array of ComponentWearTrend
+# entries; each entry is keyed by (component_id, unit) per the mixed-unit
+# handling decision (Q3) — the same component_id appears multiple times if
+# the source data uses different units. The aggregator REFUSES to mean
+# across mixed units; the UI must render each (component_id, unit) row
+# distinctly.
+#
+# §B ASYMMETRIC COVERAGE: sources from derived-sustainment only (live in
+# 6a). asset-telemetry-windows is wired in the fan-in envelope but does
+# NOT drive emissions in §B; full-join verification deferred to follow-up
+# #11 (sustainment-data test fixtures). Recipe-greenlit pre-build.
+table "region_wear_trends" {
+  schema = schema.public
+
+  column "region_id" {
+    type = text
+    null = false
+  }
+
+  # JSON array shape: [{component_id, unit, mean_rul_remaining, asset_count}].
+  column "components" {
+    type    = jsonb
+    null    = false
+    default = "[]"
+  }
+
+  column "observed_at" {
+    type = timestamptz
+    null = true
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.region_id]
+  }
+}
