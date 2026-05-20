@@ -84,6 +84,21 @@ BEGIN
 END
 $$;
 
+-- Recipe v3 Sub-phase E: asset_capability_state (capability snapshots from
+-- the customer-overlay StrikeCapabilityMessage feed). Same idempotent ALTER
+-- pattern; exposes the table to ElectricSQL Shapes so the Inventory panel
+-- (Sub-phase G) can read per-asset loaded-store / Ammo state live.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'asset_capability_state'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.asset_capability_state;
+  END IF;
+END
+$$;
+
 -- -----------------------------------------------------------------------------
 -- 2. Replication Role — Required for ElectricSQL's logical replication
 -- -----------------------------------------------------------------------------
