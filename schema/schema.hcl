@@ -386,6 +386,43 @@ table "telemetry_latest_state" {
     null = true
   }
 
+  # Phase 5 — operational_state 3-axis breakout. Distinct from `sustainment`
+  # (which is consumables / wear / fault codes — measured fields). These
+  # five columns mirror EntityTelemetryEvent.operational_state proto fields
+  # (ADR-0026): power_state × functional_mode × health_state plus the two
+  # discrete activity flags. Stored as columns rather than a nested jsonb
+  # so the SPA can render them in the Maintainer GROUND DIAGNOSTICS panel
+  # without parsing a JSON blob on every row, and so future filters
+  # ("show me every asset where power_state='MAINTENANCE'") are SQL-cheap.
+  #
+  # All NULL-able — assets without operational_state in their telemetry
+  # (legacy DIS messages, capability-only assets) leave them unset, and
+  # the SPA panel renders "—" for any axis it can't read.
+  column "power_state" {
+    type = text
+    null = true
+  }
+
+  column "functional_mode" {
+    type = text
+    null = true
+  }
+
+  column "health_state" {
+    type = text
+    null = true
+  }
+
+  column "actively_receiving" {
+    type = boolean
+    null = true
+  }
+
+  column "actively_transmitting" {
+    type = boolean
+    null = true
+  }
+
   column "provenance" {
     type    = jsonb
     null    = false
