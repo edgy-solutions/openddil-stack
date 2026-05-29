@@ -1,0 +1,77 @@
+name: Schema checks
+
+# Catches schema migration regressions at PR time rather than at deploy
+# time. Two layers of validation:
+#
+#   1. Structural checks (pytest) — runs on any host with python +
+#      pytest. Verifies filename convention, atlas.sum integrity,
+#      chronological ordering, non-empty content. Caught the missing
+#      Phase 5 atlas.sum entry on its first run (the commit message
+#      flagged "run atlas migrate hash" as a TODO; the test made it
+#      a blocker).
+#
+#   2. Atlas semantic validation — runs via the official atlas docker
+#      image. `atlas migrate validate` checks SQL syntax + cross-file
+#      consistency (e.g. dropping a column added in a later migration).
+#      `atlas migrate lint` runs additional safety checks (e.g.
+#      non-additive changes on tables in active use).
+#
+# Both layers run on push and PR to master touching schema/.
+
+on:
+  push:
+    branches: [ "master" ]
+    paths:
+      - "schema/**"
+      - ".github/workflows/schema-checks.yml"
+  pull_request:
+    branches: [ "master" ]
+    paths:
+      - "schema/**"
+      - ".github/workflows/schema-checks.yml"
+
+jobs:
+  structural-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run structural migration tests
+        run: pytest tests/test_migrations.py -v
+
+  atlas-validate:
+    runs-on: ubuntu-latest
+    # Atlas's own validation: checks that migrations parse + the
+    # cumulative schema is coherent. Uses the arigaio/atlas docker
+    # image so we don't need to install atlas on the runner.
+    container:
+      image: arigaio/atlas:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: atlas migrate validate
+        run: |
+          atlas migrate validate \
+            --dir file://schema/migrations \
+            --dev-url "sqlite://dev?mode=memory"
+
+  atlas-lint:
+    runs-on: ubuntu-latest
+    # Lint surfaces non-additive changes and other deploy-risk patterns
+    # — failures here are advisory (continue-on-error), but the
+    # output is preserved in the action logs so authors see what
+    # they introduced.
+    continue-on-error: true
+    container:
+      image: arigaio/atlas:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: atlas migrate lint (latest)
+        run: |
+          atlas migrate lint \
+            --dir file://schema/migrations \
+            --dev-url "sqlite://dev?mode=memory" \
+            --latest 1
