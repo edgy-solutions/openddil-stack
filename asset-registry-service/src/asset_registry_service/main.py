@@ -56,14 +56,54 @@ def _parse_edges(spec: str) -> list[tuple[str, str]]:
     return out
 
 
-def _load_edge_assignment(path: str) -> None:
+def _load_edge_assignment(path: str | None) -> None:
     """Read the FOB list + strategy chain YAML and configure the
     module-level strategy. Same file projector mounts at
-    /etc/openddil/edge-assignment/edge-assignment.yaml."""
-    with open(path, "r") as f:
-        cfg = yaml.safe_load(f)
+    /etc/openddil/edge-assignment/edge-assignment.yaml.
+
+    When `path` is None (no env var) OR the file doesn't exist OR is
+    empty, fall back to a permissive default: a single "unspecified"
+    fallback strategy. This lets the service start under the OSS
+    chart (which doesn't ship a FOB list) and still upsert rows --
+    all assignments will be "unspecified", which is correct for the
+    no-FOB case and gives downstream consumers an asset_id->edge cache
+    populated with the right keys, just not useful regions.
+
+    Customer overlays patch a real file in via a post-install hook
+    Job and set EDGE_ASSIGNMENT_CONFIG to point at it -- the service
+    picks it up on its next pod restart.
+    """
+    fallback_only = {
+        "strategy": "chain",
+        "chain": [],
+        "fallback": {
+            "edge_id": "edge-unspecified",
+            "region_id": "region-unspecified",
+        },
+    }
+    if not path or not os.path.isfile(path):
+        log.warning(
+            "EDGE_ASSIGNMENT_CONFIG=%r not set or missing -- "
+            "all assignments will fall back to unspecified", path,
+        )
+        ea.configure_from_config(fallback_only)
+        return
+    try:
+        with open(path, "r") as f:
+            cfg = yaml.safe_load(f)
+    except Exception as exc:
+        log.error(
+            "failed to read %r: %s -- falling back to unspecified-only", path, exc,
+        )
+        ea.configure_from_config(fallback_only)
+        return
     if not isinstance(cfg, dict):
-        raise RuntimeError(f"edge_assignment config at {path!r} is not a dict")
+        log.error(
+            "edge_assignment config at %r is not a dict -- falling back to unspecified-only",
+            path,
+        )
+        ea.configure_from_config(fallback_only)
+        return
     ea.configure_from_config(cfg)
     log.info("edge_assignment configured from %s (strategy=%s)",
              path, cfg.get("strategy", "<missing>"))
