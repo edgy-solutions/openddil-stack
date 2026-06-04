@@ -1,26 +1,28 @@
-﻿# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
 
 # Build
-bin/
-obj/
-__pycache__/
-*.pyc
-.eggs/
-*.egg-info/
-
-# Generated (protobuf)
-gen/
-
 # Environment
+# Generated (protobuf)
+# IDE
+*.egg-info/
+*.pyc
+*.swo
+*.swp
+.DS_Store
+.eggs/
 .env
 .env.local
+.idea/
+.vscode/
+Thumbs.db
+__pycache__/
+asset-registry-service/**/__pycache__/
+asset-registry-service/.pytest_cache/
+asset-registry-service/src/asset_registry_service.egg-info/
+bin/
+gen/
+obj/
 venv/
-node_modules/
+﻿# OS
+
+# venvs (asset-registry-service uses .venv for local dev)
+.venv/
