@@ -130,9 +130,15 @@ def main() -> int:
 
     _load_edge_assignment(cfg.edge_assignment_config)
 
-    # Initialize the shared postgres pool BEFORE Faust starts -- so the
-    # first event hitting the agent doesn't race against pool creation.
-    asyncio.run(db.init_pool(cfg.postgres_dsn))
+    # NOTE: db.init_pool is intentionally NOT called via asyncio.run() here.
+    # asyncio.run() runs the coroutine then CLOSES the loop, leaving
+    # MainThread without a current loop -- which Faust's @app.agent
+    # decorator hits when it constructs its internal Service objects
+    # (Service.__init__ calls asyncio.get_event_loop()). Python 3.11+
+    # raises in that case. Instead we initialize the pool via a Faust
+    # Service (_PoolInitService below) so faust.Worker owns the loop
+    # lifecycle from the start.
+    pool_init = _PoolInitService(dsn=cfg.postgres_dsn, label=cfg.app_id)
 
     hq_producer = _HqProducerService(
         hq_brokers=cfg.kafka_brokers, label=cfg.app_id,
@@ -153,18 +159,40 @@ def main() -> int:
             output_topic=cfg.output_topic,
             hq_producer=hq_producer,
             web_port=port,
+            static_region=cfg.edge_regions.get(edge_id),
         ))
 
     primary, *secondaries = apps
     worker = faust.Worker(
         primary,
         *secondaries,
+        pool_init,             # initializes the asyncpg pool on Worker start
         hq_producer,           # sidecar service, starts/stops with the worker
         loglevel=cfg.log_level.lower(),
         logging_config=None,    # we already called logging.basicConfig above
     )
     worker.execute_from_commandline()
     return 0
+
+
+class _PoolInitService(faust.Service):
+    """Initializes the module-level asyncpg pool on Worker start.
+    Lives in main so it can use the running Worker's event loop --
+    avoids the asyncio.run() -> closed-loop trap that breaks Faust's
+    Service.__init__ in Python 3.11+."""
+
+    def __init__(self, *, dsn: str, label: str) -> None:
+        super().__init__()
+        self._dsn = dsn
+        self._label = label
+
+    async def on_start(self) -> None:
+        await db.init_pool(self._dsn)
+        log.info("%s: postgres pool initialized", self._label)
+
+    async def on_stop(self) -> None:
+        await db.close_pool()
+        log.info("%s: postgres pool closed", self._label)
 
 
 if __name__ == "__main__":
