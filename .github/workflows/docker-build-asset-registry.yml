@@ -2,12 +2,12 @@ name: Docker Build — asset-registry-service
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
     paths:
       - "asset-registry-service/**"
       - ".github/workflows/docker-build-asset-registry.yml"
   pull_request:
-    branches: [ "master" ]
+    branches: [ "main" ]
     paths:
       - "asset-registry-service/**"
       - ".github/workflows/docker-build-asset-registry.yml"
