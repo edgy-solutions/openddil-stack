@@ -58,7 +58,11 @@ CREATE INDEX "idx_asset_registry_edge_id"
 CREATE INDEX "idx_asset_registry_region_id"
   ON "public"."asset_registry" ("region_id");
 
--- Add to Electric replication so the SPA can subscribe to assignments
--- (will be used by future Maintainer divergence banner + admin
--- assignment UI per ADR-0028 Phase 4).
-ALTER PUBLICATION "electric_publication" ADD TABLE "public"."asset_registry";
+-- Electric replication wiring intentionally NOT here. Convention in this
+-- repo (see openddil-stack/electric/electrify.sql) is that the
+-- electric_publication is created and managed in electrify.sql; atlas
+-- migrations only own table + index DDL. The publication entry for
+-- asset_registry lives in electrify.sql alongside the existing region_*
+-- additions (Phase 6b §B used the same idempotent pattern), so this
+-- migration stays publication-agnostic and runs cleanly on environments
+-- that bring up electric AFTER atlas.

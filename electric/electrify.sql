@@ -99,6 +99,21 @@ BEGIN
 END
 $$;
 
+-- ADR-0028 Phase 1: asset_registry — canonical asset->edge->region
+-- mapping written by asset-registry-service. The Maintainer divergence
+-- banner + admin assignment UI (Phase 4) subscribe to it via Electric.
+-- Same idempotent ALTER pattern.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'asset_registry'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.asset_registry;
+  END IF;
+END
+$$;
+
 -- -----------------------------------------------------------------------------
 -- 2. Replication Role — Required for ElectricSQL's logical replication
 -- -----------------------------------------------------------------------------
