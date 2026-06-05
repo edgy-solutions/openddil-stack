@@ -142,6 +142,7 @@ def make_edge_app(
     output_topic: str,
     hq_producer: _HqProducerService,
     web_port: int,
+    static_region: Optional[str] = None,
 ) -> faust.App:
     """Build a Faust App bound to ONE edge broker.
 
@@ -150,6 +151,13 @@ def make_edge_app(
       * run edge_assignment to compute proposed (edge_id, region_id)
       * upsert into asset_registry (postgres) per ADR-0028 priority rules
       * publish the resulting row to asset-registry-events on HQ
+
+    static_region: optional fallback region_id used when
+    edge_assignment yields the configured fallback (no FOB list / no
+    overlay). Lets OSS/demo deployments produce real region mappings
+    without mounting an edge_assignment.yaml. A non-fallback strategy
+    result always wins -- this is strictly a backstop for the
+    "no overlay" path.
     """
     app_id = f"asset-registry-{edge_id}"
     app = faust.App(
@@ -200,12 +208,24 @@ def make_edge_app(
             else:
                 proposed_source = "unspecified"
 
+            # Static region override for the "no overlay" path. When
+            # edge_assignment hit its fallback (chain empty / no match)
+            # and the operator provided a per-edge static_region, use
+            # that instead of the configured fallback region. Marked as
+            # "connection" source (priority between position and
+            # unspecified) so a real overlay-driven assignment still
+            # wins per ADR-0028.
+            proposed_region = result.region_id
+            if static_region and proposed_source == "unspecified":
+                proposed_region = static_region
+                proposed_source = "connection"
+
             try:
                 row = await db.upsert_observation(
                     asset_id=asset_id,
                     observed_edge_id=edge_id,
                     proposed_edge_id=result.edge_id,
-                    proposed_region_id=result.region_id,
+                    proposed_region_id=proposed_region,
                     proposed_source=proposed_source,
                     proposed_by=f"edge_assignment.yaml/{method}",
                 )

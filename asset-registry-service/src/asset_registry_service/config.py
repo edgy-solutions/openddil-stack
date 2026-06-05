@@ -50,6 +50,18 @@ class Config:
     # Logging verbosity. Same convention as faust-regional.
     log_level: str
 
+    # Per-edge static region fallback: maps observed edge_id to a
+    # region_id used when edge_assignment yields "region-unspecified"
+    # (no FOB list, no overlay). Lets the service produce real
+    # (edge, region) mappings in OSS/demo environments where no
+    # edge_assignment.yaml is mounted, without changing the strategy
+    # chain itself. Parsed from
+    #   ASSET_REGISTRY_EDGE_REGIONS="edge-01=region-east,edge-03=region-west"
+    # Empty/missing -> no override; service emits "region-unspecified"
+    # as before. This is intentionally tier-2: any real
+    # edge_assignment result wins.
+    edge_regions: dict
+
     @classmethod
     def from_env(cls) -> "Config":
         return cls(
@@ -76,4 +88,25 @@ class Config:
             ),
             web_port=int(os.getenv("ASSET_REGISTRY_WEB_PORT", "6070")),
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
+            edge_regions=_parse_edge_regions(
+                os.getenv("ASSET_REGISTRY_EDGE_REGIONS", "")
+            ),
         )
+
+
+def _parse_edge_regions(spec: str) -> dict:
+    """Parse 'edge-01=region-east,edge-02=region-west' -> {edge_id: region_id}.
+    Empty / whitespace-only spec yields an empty dict (no override)."""
+    out: dict[str, str] = {}
+    for entry in spec.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        if "=" not in entry:
+            raise RuntimeError(
+                f"ASSET_REGISTRY_EDGE_REGIONS entry {entry!r} must be "
+                "'edge_id=region_id'"
+            )
+        edge_id, region_id = entry.split("=", 1)
+        out[edge_id.strip()] = region_id.strip()
+    return out
