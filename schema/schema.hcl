@@ -875,3 +875,52 @@ table "asset_capability_state" {
     columns = [column.asset_id]
   }
 }
+
+# Phase 9: mrad_element_telemetry -- per-element radar telemetry for
+# MRAD-class assets, populated by openddil-mrad-sim. See migration
+# 20260613000000_phase9_mrad_element_telemetry.sql for the rationale.
+table "mrad_element_telemetry" {
+  schema = schema.public
+
+  column "asset_id" {
+    type = text
+    null = false
+  }
+
+  # JSON array: [{element_id, layer_depth, layer_name, health, temp_c, load_pct}, ...]
+  # element_id format documented in mrad-sim/README.md -- must match the
+  # frontend SensorArrayView's generateElements() output byte-for-byte.
+  column "elements" {
+    type    = jsonb
+    null    = false
+    default = "[]"
+  }
+
+  column "observed_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  # Backfilled from asset_registry. Sim has no edge attribution of its own.
+  column "edge_id" {
+    type    = text
+    null    = false
+    default = "edge-unspecified"
+  }
+  column "region_id" {
+    type    = text
+    null    = false
+    default = "region-unspecified"
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.asset_id]
+  }
+}
