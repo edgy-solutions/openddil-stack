@@ -876,10 +876,12 @@ table "asset_capability_state" {
   }
 }
 
-# Phase 9: mrad_element_telemetry -- per-element radar telemetry for
-# MRAD-class assets, populated by openddil-mrad-sim. See migration
-# 20260613000000_phase9_mrad_element_telemetry.sql for the rationale.
-table "mrad_element_telemetry" {
+# Phase 9: asset_element_telemetry -- per-element sub-component telemetry
+# for multi-element assets, populated by openddil-logistics-sim. See
+# migration 20260613000000_phase9_asset_element_telemetry.sql for
+# rationale + the multi-profile shape (MRAD first, LTAMDS / Patriot
+# to follow via config).
+table "asset_element_telemetry" {
   schema = schema.public
 
   column "asset_id" {
@@ -887,13 +889,38 @@ table "mrad_element_telemetry" {
     null = false
   }
 
-  # JSON array: [{element_id, layer_depth, layer_name, health, temp_c, load_pct}, ...]
-  # element_id format documented in mrad-sim/README.md -- must match the
-  # frontend SensorArrayView's generateElements() output byte-for-byte.
+  # Denormalized from elements/operational so per-type filters
+  # ("how many MRADs are degraded") don't need JSONB unpacking.
+  column "platform_variant" {
+    type    = text
+    null    = false
+    default = ""
+  }
+  column "profile_name" {
+    type    = text
+    null    = false
+    default = ""
+  }
+
+  # JSON array per logistics-sim publisher envelope:
+  #   [{element_id, layer_depth, layer_name, health, temp_c, load_pct,
+  #     tx_active, rx_active}, ...]
+  # element_id format documented in openddil-logistics-sim/README.md;
+  # must match the frontend SensorArrayView byte-for-byte.
   column "elements" {
     type    = jsonb
     null    = false
     default = "[]"
+  }
+
+  # Mirror of the customer feed's OperationalState (power_state,
+  # health_state, actively_transmitting, actively_receiving, degraded).
+  # Lets a consumer render the asset-level status banner without
+  # unpacking the elements array.
+  column "operational" {
+    type    = jsonb
+    null    = false
+    default = "{}"
   }
 
   column "observed_at" {
