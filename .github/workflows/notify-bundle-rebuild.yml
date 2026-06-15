@@ -1,0 +1,60 @@
+name: Notify openddil-helm to rebuild runtime-bundle
+
+# Mirrors the openddil-contracts notify-bundle-rebuild.yml -- fires a
+# repository_dispatch at openddil-helm whenever something changes in this
+# repo that the runtime-bundle's Dockerfile actually COPYs in. Without this,
+# a schema migration push to openddil-stack lands in the next bundle ONLY
+# if some OTHER notify-bundle-rebuild firing happens to overlap in time
+# (we got lucky once -- not a property to depend on).
+#
+# Paths filter is conservative: only the two subtrees the bundle Dockerfile
+# pulls from openddil-stack ('openddil-stack/schema' -> '/bundle/stack/
+# schema/', 'openddil-stack/electric' -> '/bundle/stack/electric/'). Other
+# changes in this repo (asset-registry-service source, tests, the
+# docker-build-asset-registry workflow itself) build the asset-registry
+# image directly and don't need a bundle rebuild.
+#
+# Setup (one-time per repo):
+#   1. Create a PAT (fine-grained) with:
+#        - Repository access: edgy-solutions/openddil-helm
+#        - Repository permissions: Contents = Read and write, Metadata = Read
+#   2. Store it in this repo's secrets as BUNDLE_REBUILD_PAT.
+#   3. openddil-helm's build-bundle.yml already has
+#      `repository_dispatch: types: [source-repo-changed]` -- shared with
+#      the contracts notify workflow.
+
+on:
+  push:
+    # openddil-stack default branch is `main` (verified via `git branch -vv`
+    # 2026-06-15). The other openddil-* repos use `master` -- per-repo
+    # default is whatever the repo's default actually is.
+    branches: [ "main" ]
+    paths:
+      - "schema/**"
+      - "electric/**"
+      - ".github/workflows/notify-bundle-rebuild.yml"
+  # Manual button for when you want to force a dispatch without pushing
+  # (e.g. testing the wiring, or kicking the bundle build after editing
+  # something this paths filter doesn't catch).
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch source-repo-changed to openddil-helm
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.BUNDLE_REBUILD_PAT }}
+          repository: ${{ github.repository_owner }}/openddil-helm
+          event-type: source-repo-changed
+          # Payload is informational -- build-bundle.yml doesn't read it
+          # today, but useful in Actions logs for "who triggered this".
+          client-payload: |
+            {
+              "source_repo":  "openddil-stack",
+              "ref":          "${{ github.ref }}",
+              "sha":          "${{ github.sha }}",
+              "actor":        "${{ github.actor }}",
+              "commit_url":   "${{ github.event.head_commit.url }}"
+            }
