@@ -114,6 +114,23 @@ BEGIN
 END
 $$;
 
+-- Phase 9: asset_element_telemetry — per-element sub-component tree
+-- written by openddil-logistics-sim (~23k rows per MRAD asset, stored
+-- in a JSONB elements column). The Maintainer 3D drill-down's
+-- useAssetElementTelemetry hook subscribes via Electric. Without this
+-- the frontend's depth-1+ elements render NO_DATA (grey) because the
+-- live row never reaches the browser. Same idempotent ALTER pattern.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'asset_element_telemetry'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.asset_element_telemetry;
+  END IF;
+END
+$$;
+
 -- -----------------------------------------------------------------------------
 -- 2. Replication Role — Required for ElectricSQL's logical replication
 -- -----------------------------------------------------------------------------
