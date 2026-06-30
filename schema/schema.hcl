@@ -23,18 +23,46 @@ schema "public" {}
 # This table is the primary read-model that ElectricSQL replicates to Edge
 # clients. Edge nodes query a local SQLite cache of this table for offline
 # reads. Writes go through the Outbox → Redpanda → Restate pipeline.
+#
+# 2026-06-30: gained per-asset + per-layer scoping (asset_id, layer_name)
+# to support the maintainer view's per-asset Inventory card. The sim
+# (openddil-logistics-sim) emits one row per (asset_id, layer_name) per
+# tick to asset-element-inventory; the projector upserts using
+# `<asset_id>:<layer_name>` as the row id. asset_id is nullable so
+# pre-2026-06-30 FOB-scoped rows (currently zero on the cluster) still
+# parse cleanly. Frontend Inventory.tsx filters by selectedAssetId when
+# scoped to the maintainer view.
 # -----------------------------------------------------------------------------
 table "inventory_items" {
   schema = schema.public
 
+  # Was UUID with gen_random_uuid default; switched to TEXT so the sim
+  # can produce deterministic ids of shape `<asset_id>:<layer_name>` --
+  # makes upsert keyed by id idempotent without needing a composite
+  # unique constraint. Pre-2026-06-30 rows (if any) carried UUID
+  # strings, which TEXT accepts without coercion.
   column "id" {
-    type    = uuid
-    default = sql("gen_random_uuid()")
+    type = text
   }
 
   column "name" {
     type = varchar(255)
     null = false
+  }
+
+  # Asset attribution. Nullable for back-compat with the old FOB-scoped
+  # rows (no asset). The sim populates this for every emitted row.
+  column "asset_id" {
+    type = text
+    null = true
+  }
+
+  # Layer this inventory bar represents (e.g. "T/R MODULE", "BACKPLANE").
+  # Nullable for back-compat; populated by the sim. Combined with
+  # asset_id it uniquely identifies a sim-emitted row.
+  column "layer_name" {
+    type = text
+    null = true
   }
 
   column "available_count" {
@@ -63,6 +91,13 @@ table "inventory_items" {
 
   primary_key {
     columns = [column.id]
+  }
+
+  # Frontend Inventory.tsx filters rows by selectedAssetId; the index
+  # keeps that filter cheap as the table grows (with 4 layers per
+  # asset, an 800-asset fleet pushes the table to ~3200 rows).
+  index "idx_inventory_items_asset_id" {
+    columns = [column.asset_id]
   }
 }
 

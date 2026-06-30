@@ -1,4 +1,4 @@
-h1:g01hRaePCu2VT7V9mteGGbvIcWv5kxkJDt6D4RJ2rnI=
+h1:0FzM9TvUKlpqGp98g2x/QHbuNswHwaffxvk0QOKDDH8=
 20260514040446_phase4a_pipeline_tables.sql h1:xGr2G36CM3DuKCB6+75KdwqjuLN/vkHsF3gAClJsV/Q=
 20260514110726_phase4a_cm_manual_discrepancies.sql h1:mHyFISzalKwI/FPYu8L7/UIMSpytue/ryycPRaYPy9M=
 20260514150847_phase4c5_edge_buffer_status.sql h1:a81UFmgUgHpbfYXlRBueSCdWSNQCKzsurmMuFZwpjv0=
@@ -8,3 +8,4 @@ h1:g01hRaePCu2VT7V9mteGGbvIcWv5kxkJDt6D4RJ2rnI=
 20260529010000_phase5_operational_state_columns.sql h1:z0150ngys9W4wYnjBrHpaiv2dfT42syAdHghPfaLkO4=
 20260604202813_phase8_asset_registry.sql h1:c+CVlIKD4DUDTFqwt5t+imHsvv53Dc+fcsXiR3Vful8=
 20260613000000_phase9_asset_element_telemetry.sql h1:lpOERM6NIxKiJyomUUUoB3Z2J4fXlib5XH9U+L9OyRY=
+20260630000000_inventory_per_asset_per_layer.sql h1:nmqOxwXshm/WGSPDZNDbD/WJvmmz4jxxwupbJsfyUws=
