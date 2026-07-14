@@ -848,13 +848,14 @@ table "region_wear_trends" {
 }
 
 # Producer: openddil-projector capability_state handler, from the
-# customer-overlay `asset-capability-snapshot` Silver topic. Recipe v3
-# Sub-phase E. Compaction key: asset_id. One row per asset holding the
-# latest StrikeCapabilityMessage snapshot; `capabilities` is the per-store
-# array stored verbatim as JSONB (the projector handler returns one Write
-# per message, so per-store rows would need a multi-Write signature change
-# -- the JSONB array keeps the projector model intact while still carrying
-# per-store granularity for the UI and the engagement-worthiness factor).
+# `asset-capability-snapshot` Silver topic. Recipe v3 Sub-phase E.
+# Compaction key: asset_id. One row per asset holding the latest
+# weapons-capability snapshot; `capabilities` is the per-store array
+# stored verbatim as JSONB (the projector handler returns one Write
+# per message, so per-store rows would need a multi-Write signature
+# change -- the JSONB array keeps the projector model intact while
+# still carrying per-store granularity for the UI and the engagement-
+# worthiness factor).
 table "asset_capability_state" {
   schema = schema.public
 
