@@ -174,6 +174,20 @@ table "audit_log" {
 table "asset_cm_state" {
   schema = schema.public
 
+  # ADR-0029 coalition releasability labels. Real columns (not JSONB) because
+  # the read-path PEP composes a WHERE clause over them on every subscription.
+  # Nullable until the labelling backfill completes -- deny-unlabeled must not
+  # be enabled before the completeness gate returns zero (ADR-0029 s7).
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
+
   column "asset_id" {
     type = text
     null = false
@@ -277,6 +291,20 @@ table "asset_cm_state" {
 table "asset_logistics_status" {
   schema = schema.public
 
+  # ADR-0029 coalition releasability labels. Real columns (not JSONB) because
+  # the read-path PEP composes a WHERE clause over them on every subscription.
+  # Nullable until the labelling backfill completes -- deny-unlabeled must not
+  # be enabled before the completeness gate returns zero (ADR-0029 s7).
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
+
   column "asset_id" {
     type = text
     null = false
@@ -375,6 +403,20 @@ table "asset_logistics_status" {
 # compacted. Producer: faust-edge (openddil-tactical-agents).
 table "telemetry_latest_state" {
   schema = schema.public
+
+  # ADR-0029 coalition releasability labels. Real columns (not JSONB) because
+  # the read-path PEP composes a WHERE clause over them on every subscription.
+  # Nullable until the labelling backfill completes -- deny-unlabeled must not
+  # be enabled before the completeness gate returns zero (ADR-0029 s7).
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
 
   column "asset_id" {
     type = text
@@ -859,6 +901,20 @@ table "region_wear_trends" {
 table "asset_capability_state" {
   schema = schema.public
 
+  # ADR-0029 coalition releasability labels. Real columns (not JSONB) because
+  # the read-path PEP composes a WHERE clause over them on every subscription.
+  # Nullable until the labelling backfill completes -- deny-unlabeled must not
+  # be enabled before the completeness gate returns zero (ADR-0029 s7).
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
+
   column "asset_id" {
     type = text
     null = false
@@ -919,6 +975,20 @@ table "asset_capability_state" {
 # to follow via config).
 table "asset_element_telemetry" {
   schema = schema.public
+
+  # ADR-0029 coalition releasability labels. Real columns (not JSONB) because
+  # the read-path PEP composes a WHERE clause over them on every subscription.
+  # Nullable until the labelling backfill completes -- deny-unlabeled must not
+  # be enabled before the completeness gate returns zero (ADR-0029 s7).
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
 
   column "asset_id" {
     type = text
