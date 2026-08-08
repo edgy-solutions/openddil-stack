@@ -1,6 +1,6 @@
 -- Create "asset_capability_state" table
 -- Recipe v3 Sub-phase E: capability-snapshot projector target. One row per
--- asset holding the latest StrikeCapabilityMessage snapshot; capabilities is
+-- asset holding the latest weapons-capability snapshot; capabilities is
 -- the per-store array stored verbatim as JSONB.
 CREATE TABLE "public"."asset_capability_state" (
   "asset_id" text NOT NULL,
