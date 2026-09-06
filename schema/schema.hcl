@@ -99,6 +99,23 @@ table "inventory_items" {
   index "idx_inventory_items_asset_id" {
     columns = [column.asset_id]
   }
+
+  # ADR-0029 releasability labels. Added by the labelling block
+  # (20260906000000) — the "additive later" the Arc-1 migration named. Each
+  # row here derives from an already-labelled asset, so stamping is
+  # PROPAGATION of an existing decision rather than a new one.
+  # Nullable: deny-unlabeled means unstamped rows are releasable to nobody,
+  # which is the safe direction while the projector catches up.
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
+
 }
 
 # -----------------------------------------------------------------------------
@@ -601,6 +618,23 @@ table "tactical_events" {
   index "idx_tactical_events_subject_time" {
     columns = [column.subject, column.time]
   }
+
+  # ADR-0029 releasability labels. Added by the labelling block
+  # (20260906000000) — the "additive later" the Arc-1 migration named. Each
+  # row here derives from an already-labelled asset, so stamping is
+  # PROPAGATION of an existing decision rather than a new one.
+  # Nullable: deny-unlabeled means unstamped rows are releasable to nobody,
+  # which is the safe direction while the projector catches up.
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
+
 }
 
 # Per-asset rolling-window aggregations. Source: topic `asset-telemetry-windows`,
@@ -675,6 +709,23 @@ table "asset_telemetry_windows" {
   primary_key {
     columns = [column.asset_id]
   }
+
+  # ADR-0029 releasability labels. Added by the labelling block
+  # (20260906000000) — the "additive later" the Arc-1 migration named. Each
+  # row here derives from an already-labelled asset, so stamping is
+  # PROPAGATION of an existing decision rather than a new one.
+  # Nullable: deny-unlabeled means unstamped rows are releasable to nobody,
+  # which is the safe direction while the projector catches up.
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
+
 }
 
 # -----------------------------------------------------------------------------

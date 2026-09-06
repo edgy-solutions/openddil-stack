@@ -1,4 +1,4 @@
-h1:tFT6Ol4CLQ8fEcwPX4bjGc93nhXzi8v2ah/6bkwd3eE=
+h1:pcaxO1Paes+mthqNH4YTv26A27eQldiBMh+s9qLaG0c=
 20260514040446_phase4a_pipeline_tables.sql h1:xGr2G36CM3DuKCB6+75KdwqjuLN/vkHsF3gAClJsV/Q=
 20260514110726_phase4a_cm_manual_discrepancies.sql h1:mHyFISzalKwI/FPYu8L7/UIMSpytue/ryycPRaYPy9M=
 20260514150847_phase4c5_edge_buffer_status.sql h1:a81UFmgUgHpbfYXlRBueSCdWSNQCKzsurmMuFZwpjv0=
@@ -10,3 +10,5 @@ h1:tFT6Ol4CLQ8fEcwPX4bjGc93nhXzi8v2ah/6bkwd3eE=
 20260613000000_phase9_asset_element_telemetry.sql h1:5hTrHjOxQiHibgIw91MJUPEzpV0Z95/SWohB3fNVZGg=
 20260630000000_inventory_per_asset_per_layer.sql h1:8gh9EqGrVlsUQ2EdEHJeEs3B8gcP0ibJSAeH6IpmgjM=
 20260807000000_arc1_releasability_labels.sql h1:0UVya3w+73dpaxC3O232SIDES1RvBOppd7jNy+bKE2E=
+20260906000000_labelling_block_asset_bearing_tables.sql h1:YH2M1VZYBI/7os1uWt0yvM0tC0GJroa/KENKyfnR/KY=
+20260906010000_labelling_block_backfill.sql h1:wweh2zZkzzaLlnbc62pstOkjFC4XVOoRv/uCJz2gEy8=
