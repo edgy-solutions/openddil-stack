@@ -108,7 +108,10 @@ def _try_decode_event(raw: bytes) -> Optional[dict]:
             pos = (((data.get("kinematics") or {}).get("position") or {}).get("wgs84") or {})
             lat = ((pos.get("lat") or {}).get("value") if isinstance(pos.get("lat"), dict) else pos.get("lat"))
             lon = ((pos.get("lon") or {}).get("value") if isinstance(pos.get("lon"), dict) else pos.get("lon"))
-            return {"asset_id": asset_id, "lat": lat, "lon": lon}
+            prov = data.get("provenance") or {}
+            return {"asset_id": asset_id, "lat": lat, "lon": lon,
+                    "originator_nation": prov.get("originator_nation") or "",
+                    "releasable_to": list(prov.get("releasable_to") or [])}
     except Exception:
         pass
     # Proto path. Imported lazily so the service doesn't hard-require
@@ -125,7 +128,16 @@ def _try_decode_event(raw: bytes) -> Optional[dict]:
         wgs = ev.kinematics.position.wgs84
         lat = wgs.lat.value if wgs.HasField("lat") else None
         lon = wgs.lon.value if wgs.HasField("lon") else None
-        return {"asset_id": asset_id, "lat": lat, "lon": lon}
+        # ADR-0029: the labels ride with the observation. This service is the
+        # authoritative writer of asset_registry, so a row it creates without
+        # them is a row the §4 filter can never serve -- and since the
+        # regional rollups are now composed by releasability class, ONE
+        # unlabelled asset takes its class to the empty audience and blanks a
+        # regional screen rather than hiding a single row. Carried, never
+        # re-derived: the earliest tier that knows states it.
+        return {"asset_id": asset_id, "lat": lat, "lon": lon,
+                "originator_nation": ev.provenance.originator_nation or "",
+                "releasable_to": list(ev.provenance.releasable_to)}
     except Exception as exc:
         log.debug("proto decode failed: %s", exc)
         return None
@@ -228,6 +240,8 @@ def make_edge_app(
                     proposed_region_id=proposed_region,
                     proposed_source=proposed_source,
                     proposed_by=f"edge_assignment.yaml/{method}",
+                    originator_nation=event.get("originator_nation") or "",
+                    releasable_to=event.get("releasable_to") or [],
                 )
             except Exception as exc:
                 log.error("upsert failed for %s: %s", asset_id, exc)

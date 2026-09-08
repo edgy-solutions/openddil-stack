@@ -92,6 +92,8 @@ async def upsert_observation(
     proposed_region_id: str,
     proposed_source: str,
     proposed_by: str,
+    originator_nation: str = "",
+    releasable_to: list | None = None,
 ) -> RegistryRow:
     """Apply one observation. Returns the resulting row (what's now in
     the table, which may NOT match what we proposed if a higher-priority
@@ -106,6 +108,13 @@ async def upsert_observation(
                        what THIS observation would assign to, if it
                        wins the priority comparison
       proposed_by:     audit field (e.g. "edge_assignment.yaml")
+      originator_nation, releasable_to:
+                       ADR-0029 labels from the OBSERVATION's provenance.
+                       Stamped on INSERT and never re-derived. Absent labels
+                       are written as NULL rather than as an empty claim --
+                       "we were not told" must stay distinguishable from
+                       "released to nobody", and the completeness gate counts
+                       them differently.
 
     Behavior:
       - No row exists -> INSERT with the proposed assignment.
@@ -136,13 +145,29 @@ async def upsert_observation(
         if existing is None:
             # First observation: full insert.
             divergent = proposed_edge_id != observed_edge_id
+            # LABELS ARE STAMPED AT INSERT. Until 2026-09-08 this service
+            # wrote unlabelled rows and a one-off backfill covered what
+            # existed, so the gate read zero unlabelled while every NEW asset
+            # arrived unlabelled -- a clean gate over a leaking writer.
+            #
+            # The cost changed when regional rollups became composed by
+            # releasability class: an unlabelled asset has an empty effective
+            # audience, so it forms the '' class and is visible to nobody.
+            # One such row no longer hides an asset, it removes it from every
+            # audience's rollup.
+            #
+            # NULL, not '' / '{}', when the observation carries nothing: an
+            # absent claim and a claim of nothing are different absences.
             await conn.execute(
                 'INSERT INTO asset_registry '
                 '(asset_id, edge_id, region_id, assignment_source, '
-                ' assigned_by, last_observed_at, observed_edge_id, divergent) '
-                'VALUES ($1, $2, $3, $4, $5, now(), $6, $7)',
+                ' assigned_by, last_observed_at, observed_edge_id, divergent, '
+                ' originator_nation, releasable_to) '
+                'VALUES ($1, $2, $3, $4, $5, now(), $6, $7, $8, $9)',
                 asset_id, proposed_edge_id, proposed_region_id,
                 proposed_source, proposed_by, observed_edge_id, divergent,
+                originator_nation or None,
+                list(releasable_to) if releasable_to is not None else None,
             )
             return RegistryRow(
                 asset_id=asset_id,
