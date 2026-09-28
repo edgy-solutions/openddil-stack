@@ -517,6 +517,40 @@ table "telemetry_latest_state" {
     null = true
   }
 
+  # ADR-0044 lifecycle slice 1 — two independent, timestamped columns.
+  # `operational_status` answers "what is true of the asset" and moves only
+  # on a signal about the asset itself (e.g. a DIS damage=DESTROYED report).
+  # `reporting_status` answers "what is true of our knowledge of it" and
+  # moves only on the arrival or non-arrival of records, evaluated per
+  # reading tier (ADR §4) — never shared or computed globally. Keeping
+  # these as two columns is the entire point of the ADR: Finding 1 is that
+  # the legacy `lifecycle`/`health_state` style fields conflate both
+  # questions into one value, so a destroyed-but-still-transmitting asset
+  # and a quiet-but-healthy asset become indistinguishable. Defaults assume
+  # the common case (present and accounted for) so existing rows written
+  # before this migration read as intended rather than as unknown/null.
+  column "operational_status" {
+    type    = text
+    null    = false
+    default = "operational"
+  }
+
+  column "operational_status_at" {
+    type = timestamptz
+    null = true
+  }
+
+  column "reporting_status" {
+    type    = text
+    null    = false
+    default = "reporting"
+  }
+
+  column "reporting_status_at" {
+    type = timestamptz
+    null = true
+  }
+
   column "provenance" {
     type    = jsonb
     null    = false
