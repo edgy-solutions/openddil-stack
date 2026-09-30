@@ -579,6 +579,70 @@ table "telemetry_latest_state" {
   }
 }
 
+# ADR-0044 §4 rollup over telemetry_latest_state's two lifecycle columns.
+# Grouped by (region_id, originator_nation, releasable_to) -- the same
+# partitioning discipline region_fleet_summary/top_factors/wear_trends use
+# for a different reason (see 20260908000000_region_rollup_releasability.sql):
+# those three compose ACROSS assets and need an intersection rule computed
+# upstream, while this view groups assets that already share one
+# releasability partition, so there is no cross-partition arithmetic inside
+# it for a PEP to get wrong. It does NOT compose by summing rows: two rows
+# for the same region_id but different releasable_to are two different
+# viewers' worlds (ADR-0043 §4), and adding their fleet_total columns would
+# manufacture a number no single viewer is entitled to see. See the
+# migration file for the full rationale, including why a NULL-labelled row
+# is real and not merged away.
+view "asset_lifecycle_summary" {
+  schema = schema.public
+
+  column "region_id" {
+    type = text
+  }
+  column "originator_nation" {
+    type = text
+  }
+  column "releasable_to" {
+    type = sql("text[]")
+  }
+  column "fleet_total" {
+    type = bigint
+  }
+  column "operational" {
+    type = bigint
+  }
+  column "destroyed" {
+    type = bigint
+  }
+  column "deactivated" {
+    type = bigint
+  }
+  column "removed" {
+    type = bigint
+  }
+  column "reporting" {
+    type = bigint
+  }
+  column "not_reporting" {
+    type = bigint
+  }
+
+  as = <<-SQL
+  SELECT
+      "region_id",
+      "originator_nation",
+      "releasable_to",
+      COUNT(*)                                                     AS "fleet_total",
+      COUNT(*) FILTER (WHERE "operational_status" = 'operational') AS "operational",
+      COUNT(*) FILTER (WHERE "operational_status" = 'destroyed')   AS "destroyed",
+      COUNT(*) FILTER (WHERE "operational_status" = 'deactivated') AS "deactivated",
+      COUNT(*) FILTER (WHERE "operational_status" = 'removed')     AS "removed",
+      COUNT(*) FILTER (WHERE "reporting_status" = 'reporting')     AS "reporting",
+      COUNT(*) FILTER (WHERE "reporting_status" = 'not_reporting') AS "not_reporting"
+  FROM "public"."telemetry_latest_state"
+  GROUP BY "region_id", "originator_nation", "releasable_to"
+  SQL
+}
+
 # Append-only CloudEvents log. Source: topic `tactical-events`. Producers:
 # openddil-cm-service (config alerts), openddil-logistics-fusion-service
 # (logistics-CRITICAL transitions). Retained 24h by a projector-side pruner.
