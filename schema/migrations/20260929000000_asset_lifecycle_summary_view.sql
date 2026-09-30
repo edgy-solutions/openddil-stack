@@ -34,7 +34,6 @@
 -- and "reporting" for one more tick before the staleness sweep catches up,
 -- and this view does not collapse that distinction either.
 
-BEGIN;
 
 CREATE VIEW "public"."asset_lifecycle_summary" AS
 SELECT
@@ -51,4 +50,3 @@ SELECT
 FROM "public"."telemetry_latest_state"
 GROUP BY "region_id", "originator_nation", "releasable_to";
 
-COMMIT;
