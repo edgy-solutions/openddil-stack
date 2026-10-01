@@ -934,6 +934,30 @@ table "region_fleet_summary" {
     null    = false
     default = 0
   }
+
+  # ADR-0044 §3: terminal operational-status partitions. nominal/degraded/
+  # critical/non_operational above count only assets WITHOUT a terminal
+  # operational-status claim; these three count the assets that have one.
+  # asset_count is the whole partition (buckets + terminal), so a destroyed
+  # asset stays in asset_count. Adopted verbatim from the wire message
+  # (faust-regional's aggregator has already done the counting), never
+  # re-derived here.
+  column "destroyed" {
+    type    = integer
+    null    = false
+    default = 0
+  }
+  column "deactivated" {
+    type    = integer
+    null    = false
+    default = 0
+  }
+  column "removed" {
+    type    = integer
+    null    = false
+    default = 0
+  }
+
   column "asset_count" {
     type    = integer
     null    = false
