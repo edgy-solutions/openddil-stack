@@ -1,4 +1,4 @@
-h1:/wmu/pgju2lmfrF1cUDiA8ZhapiSrD9OeM76TScIIiM=
+h1:eNUJVhljGFsRsp0E+D20r75sA8Yu8yc5dtiijSRp3GI=
 20260514040446_phase4a_pipeline_tables.sql h1:xGr2G36CM3DuKCB6+75KdwqjuLN/vkHsF3gAClJsV/Q=
 20260514110726_phase4a_cm_manual_discrepancies.sql h1:mHyFISzalKwI/FPYu8L7/UIMSpytue/ryycPRaYPy9M=
 20260514150847_phase4c5_edge_buffer_status.sql h1:a81UFmgUgHpbfYXlRBueSCdWSNQCKzsurmMuFZwpjv0=
@@ -17,3 +17,4 @@ h1:/wmu/pgju2lmfrF1cUDiA8ZhapiSrD9OeM76TScIIiM=
 20260927000000_lifecycle_two_columns.sql h1:UQcl03lHtON10PEeYaO5Hd1fD0NEXjstcFKbP0NlmxY=
 20260929000000_asset_lifecycle_summary_view.sql h1:8+qHRRHVNzQsAQF5cjxjYyIeyv7dsbGQJA9vqrlpi48=
 20261001000000_region_fleet_summary_terminal_status.sql h1:8eULfbuBDg1gnibvxUs1kbiGFKikWA7SF9RaoHJp744=
+20261002000000_maintenance_actions.sql h1:6NX8jHWOUK+JAuwMUYDWjg6449NxpxzrfKeitbZJ8ic=

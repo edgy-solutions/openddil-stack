@@ -1230,3 +1230,75 @@ table "asset_element_telemetry" {
     columns = [column.asset_id]
   }
 }
+
+# ADR-0046 s5: maintenance_actions -- the owning tier's local decision about
+# an arriving MaintenanceAction, and the row the maintenance egress gate
+# (source maint-actions-decided, destination system:mmis-stand-in) reads to
+# release a work order toward the maintenance-management stand-in.
+table "maintenance_actions" {
+  schema = schema.public
+
+  # Real columns, not nested in work_order or provenance, so the egress
+  # gate reads this table's label exactly the way it reads
+  # asset_logistics_status's -- one predicate, no second label-extraction
+  # path for a second record source (ADR-0043). Copied from the action's
+  # event per ADR-0046 s4, but stored flat here for that reason.
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type    = sql("text[]")
+    null    = false
+    default = sql("'{}'::text[]")
+  }
+
+  column "action_id" {
+    type = text
+    null = false
+  }
+  column "event_id" {
+    type = text
+    null = false
+  }
+  column "asset_id" {
+    type = text
+    null = false
+  }
+  column "owning_tier" {
+    type = text
+    null = false
+  }
+
+  # ADR-0046 s4: work_order.task / task_refs / parts / outcome.
+  column "work_order" {
+    type = jsonb
+    null = false
+  }
+
+  # ADR-0046 s4: ordered {step, role, approver_sub, decision, decided_at,
+  # a reference to iagent's decision record for that step}.
+  column "approval_chain" {
+    type = jsonb
+    null = false
+  }
+
+  column "provenance" {
+    type    = jsonb
+    null    = false
+    default = "{}"
+  }
+
+  # Every row is a decided action (ADR-0046 s1: OpenDDIL holds no workflow
+  # state), never a pending placeholder -- no default, because there is no
+  # shape for "not yet decided" to default into.
+  column "decided_at" {
+    type = timestamptz
+    null = false
+  }
+
+  primary_key {
+    columns = [column.action_id]
+  }
+}
