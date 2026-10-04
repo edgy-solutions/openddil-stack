@@ -212,8 +212,8 @@ def make_edge_app(
             method = result.derivation_basis.get("method", "")
             if method in ("nearest_fob",):
                 proposed_source = "position"
-            elif method in ("asset_id_prefix", "static"):
-                # asset_id_prefix is operator-supplied static config -- it
+            elif method == "static_map":
+                # static_map is operator-supplied static config -- it
                 # ARRIVES via YAML, not telemetry observation, so treat
                 # it as a static assignment for priority purposes.
                 proposed_source = "static"
