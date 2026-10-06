@@ -232,3 +232,124 @@ def test_priority_table_matches_adr():
     # Exactly four sources -- adding one means the CHECK constraint
     # in the migration also needs updating in lockstep.
     assert set(p.keys()) == {"static", "connection", "position", "unspecified"}
+
+
+# ---------------------------------------------------------------------------
+# platform_variant: recorded, not stamped-once -- a later non-empty
+# observation updates it; an empty observation never clears it. Unlike
+# the labels, this holds on EVERY path (insert, replace, keep).
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_insert_writes_platform_variant(fake_pool_empty):
+    _, conn = fake_pool_empty
+    row = await db.upsert_observation(
+        asset_id="ASSET-A",
+        observed_edge_id="edge-01",
+        proposed_edge_id="edge-01",
+        proposed_region_id="region-east",
+        proposed_source="position",
+        proposed_by="edge_assignment.yaml/nearest_fob",
+        platform_variant="variant-x",
+    )
+    assert row.platform_variant == "variant-x"
+
+
+@pytest.mark.asyncio
+async def test_insert_defaults_platform_variant_empty(fake_pool_empty):
+    _, conn = fake_pool_empty
+    row = await db.upsert_observation(
+        asset_id="ASSET-A",
+        observed_edge_id="edge-01",
+        proposed_edge_id="edge-01",
+        proposed_region_id="region-east",
+        proposed_source="position",
+        proposed_by="edge_assignment.yaml/nearest_fob",
+    )
+    assert row.platform_variant == ""
+
+
+@pytest.mark.asyncio
+async def test_keep_path_adopts_new_nonempty_variant(fake_pool_existing):
+    """Same-or-higher priority keeps the assignment, but a non-empty
+    observed variant still updates the stored variant -- recording is
+    independent of the assignment-priority comparison."""
+    _, conn = fake_pool_existing
+    conn.seeded_row = {
+        "edge_id": "edge-01",
+        "region_id": "region-east",
+        "assignment_source": "static",
+        "platform_variant": "variant-old",
+    }
+    row = await db.upsert_observation(
+        asset_id="ASSET-A",
+        observed_edge_id="edge-01",
+        proposed_edge_id="edge-01",
+        proposed_region_id="region-east",
+        proposed_source="position",
+        proposed_by="edge_assignment.yaml/nearest_fob",
+        platform_variant="variant-new",
+    )
+    assert row.platform_variant == "variant-new"
+
+
+@pytest.mark.asyncio
+async def test_keep_path_empty_observation_does_not_clear_variant(fake_pool_existing):
+    _, conn = fake_pool_existing
+    conn.seeded_row = {
+        "edge_id": "edge-01",
+        "region_id": "region-east",
+        "assignment_source": "static",
+        "platform_variant": "variant-old",
+    }
+    row = await db.upsert_observation(
+        asset_id="ASSET-A",
+        observed_edge_id="edge-01",
+        proposed_edge_id="edge-01",
+        proposed_region_id="region-east",
+        proposed_source="position",
+        proposed_by="edge_assignment.yaml/nearest_fob",
+        # platform_variant omitted -- this observation didn't carry one.
+    )
+    assert row.platform_variant == "variant-old"
+
+
+@pytest.mark.asyncio
+async def test_replace_path_adopts_new_nonempty_variant(fake_pool_existing):
+    _, conn = fake_pool_existing
+    conn.seeded_row = {
+        "edge_id": "edge-02",
+        "region_id": "region-west",
+        "assignment_source": "position",
+        "platform_variant": "variant-old",
+    }
+    row = await db.upsert_observation(
+        asset_id="ASSET-A",
+        observed_edge_id="edge-02",
+        proposed_edge_id="edge-01",
+        proposed_region_id="region-east",
+        proposed_source="static",
+        proposed_by="warfighter-ui",
+        platform_variant="variant-new",
+    )
+    assert row.platform_variant == "variant-new"
+
+
+@pytest.mark.asyncio
+async def test_replace_path_empty_observation_does_not_clear_variant(fake_pool_existing):
+    _, conn = fake_pool_existing
+    conn.seeded_row = {
+        "edge_id": "edge-02",
+        "region_id": "region-west",
+        "assignment_source": "position",
+        "platform_variant": "variant-old",
+    }
+    row = await db.upsert_observation(
+        asset_id="ASSET-A",
+        observed_edge_id="edge-02",
+        proposed_edge_id="edge-01",
+        proposed_region_id="region-east",
+        proposed_source="static",
+        proposed_by="warfighter-ui",
+    )
+    assert row.platform_variant == "variant-old"

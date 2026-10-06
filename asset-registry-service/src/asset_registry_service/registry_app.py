@@ -93,7 +93,10 @@ class _HqProducerService(faust.Service):
 # via the same pattern; we mirror it here.
 def _try_decode_event(raw: bytes) -> Optional[dict]:
     """Decode an event payload into a dict containing at minimum
-    {'asset_id': str, 'lat': float, 'lon': float} when possible.
+    {'asset_id': str, 'lat': float, 'lon': float} when possible, plus
+    whatever labels/platform_variant the event carries (empty string/
+    list when absent -- the registry records what it is told, it does
+    not go looking for more).
     Returns None if neither decode path yields position-bearing data.
     """
     # Try JSON first (cheap, deterministic). Some upstream pipelines
@@ -109,9 +112,11 @@ def _try_decode_event(raw: bytes) -> Optional[dict]:
             lat = ((pos.get("lat") or {}).get("value") if isinstance(pos.get("lat"), dict) else pos.get("lat"))
             lon = ((pos.get("lon") or {}).get("value") if isinstance(pos.get("lon"), dict) else pos.get("lon"))
             prov = data.get("provenance") or {}
+            platform_variant = (data.get("asset") or {}).get("platform_variant") or ""
             return {"asset_id": asset_id, "lat": lat, "lon": lon,
                     "originator_nation": prov.get("originator_nation") or "",
-                    "releasable_to": list(prov.get("releasable_to") or [])}
+                    "releasable_to": list(prov.get("releasable_to") or []),
+                    "platform_variant": platform_variant}
     except Exception:
         pass
     # Proto path. Imported lazily so the service doesn't hard-require
@@ -137,7 +142,8 @@ def _try_decode_event(raw: bytes) -> Optional[dict]:
         # re-derived: the earliest tier that knows states it.
         return {"asset_id": asset_id, "lat": lat, "lon": lon,
                 "originator_nation": ev.provenance.originator_nation or "",
-                "releasable_to": list(ev.provenance.releasable_to)}
+                "releasable_to": list(ev.provenance.releasable_to),
+                "platform_variant": ev.asset.platform_variant or ""}
     except Exception as exc:
         log.debug("proto decode failed: %s", exc)
         return None
@@ -242,6 +248,7 @@ def make_edge_app(
                     proposed_by=f"edge_assignment.yaml/{method}",
                     originator_nation=event.get("originator_nation") or "",
                     releasable_to=event.get("releasable_to") or [],
+                    platform_variant=event.get("platform_variant") or "",
                 )
             except Exception as exc:
                 log.error("upsert failed for %s: %s", asset_id, exc)
@@ -258,6 +265,7 @@ def make_edge_app(
                 "assignment_source": row.assignment_source,
                 "observed_edge_id": row.observed_edge_id,
                 "divergent": row.divergent,
+                "platform_variant": row.platform_variant,
             }).encode("utf-8")
             try:
                 await hq_producer.send(output_topic, key=asset_id, value=payload)

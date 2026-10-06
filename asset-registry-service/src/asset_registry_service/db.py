@@ -50,6 +50,7 @@ class RegistryRow:
     assigned_by: str
     observed_edge_id: Optional[str] = None
     divergent: bool = False
+    platform_variant: str = ""
 
 
 # Module-level pool; initialized once in init_pool().
@@ -94,6 +95,7 @@ async def upsert_observation(
     proposed_by: str,
     originator_nation: str = "",
     releasable_to: list | None = None,
+    platform_variant: str = "",
 ) -> RegistryRow:
     """Apply one observation. Returns the resulting row (what's now in
     the table, which may NOT match what we proposed if a higher-priority
@@ -115,6 +117,15 @@ async def upsert_observation(
                        "we were not told" must stay distinguishable from
                        "released to nobody", and the completeness gate counts
                        them differently.
+      platform_variant: the asset's variant, as stated by this observation.
+                       Unlike the labels above, this is RECORDED, not
+                       stamped-once: a later observation that states a
+                       non-empty variant overwrites what's stored, because
+                       the registry is reporting the latest thing it was
+                       told, not fixing a decision at first sight. An
+                       observation that carries no variant ("") never
+                       clears a variant the registry already has -- absence
+                       of new information is not new information.
 
     Behavior:
       - No row exists -> INSERT with the proposed assignment.
@@ -138,8 +149,8 @@ async def upsert_observation(
         # selected by Python) rather than a clever ON CONFLICT clause --
         # easier to reason about + audit.
         existing = await conn.fetchrow(
-            'SELECT edge_id, region_id, assignment_source FROM asset_registry '
-            'WHERE asset_id = $1',
+            'SELECT edge_id, region_id, assignment_source, platform_variant '
+            'FROM asset_registry WHERE asset_id = $1',
             asset_id,
         )
         if existing is None:
@@ -162,12 +173,13 @@ async def upsert_observation(
                 'INSERT INTO asset_registry '
                 '(asset_id, edge_id, region_id, assignment_source, '
                 ' assigned_by, last_observed_at, observed_edge_id, divergent, '
-                ' originator_nation, releasable_to) '
-                'VALUES ($1, $2, $3, $4, $5, now(), $6, $7, $8, $9)',
+                ' originator_nation, releasable_to, platform_variant) '
+                'VALUES ($1, $2, $3, $4, $5, now(), $6, $7, $8, $9, $10)',
                 asset_id, proposed_edge_id, proposed_region_id,
                 proposed_source, proposed_by, observed_edge_id, divergent,
                 originator_nation or None,
                 list(releasable_to) if releasable_to is not None else None,
+                platform_variant or "",
             )
             return RegistryRow(
                 asset_id=asset_id,
@@ -177,6 +189,7 @@ async def upsert_observation(
                 assigned_by=proposed_by,
                 observed_edge_id=observed_edge_id,
                 divergent=divergent,
+                platform_variant=platform_variant or "",
             )
 
         existing_source = existing["assignment_source"]
@@ -186,15 +199,17 @@ async def upsert_observation(
             # Strictly higher priority wins (e.g. new static beats old
             # position). Replace the assignment + reset assigned_at.
             divergent = proposed_edge_id != observed_edge_id
+            kept_variant = platform_variant or existing.get("platform_variant") or ""
             await conn.execute(
                 'UPDATE asset_registry SET '
                 '  edge_id = $2, region_id = $3, assignment_source = $4, '
                 '  assigned_by = $5, assigned_at = now(), '
                 '  last_observed_at = now(), observed_edge_id = $6, '
-                '  divergent = $7 '
+                '  divergent = $7, platform_variant = $8 '
                 'WHERE asset_id = $1',
                 asset_id, proposed_edge_id, proposed_region_id,
                 proposed_source, proposed_by, observed_edge_id, divergent,
+                kept_variant,
             )
             return RegistryRow(
                 asset_id=asset_id,
@@ -204,6 +219,7 @@ async def upsert_observation(
                 assigned_by=proposed_by,
                 observed_edge_id=observed_edge_id,
                 divergent=divergent,
+                platform_variant=kept_variant,
             )
 
         # Existing assignment >= proposed priority -> keep it. Just
@@ -211,12 +227,14 @@ async def upsert_observation(
         # the existing edge_id.
         kept_edge_id = existing["edge_id"]
         kept_region_id = existing["region_id"]
+        kept_variant = platform_variant or existing.get("platform_variant") or ""
         divergent = kept_edge_id != observed_edge_id
         await conn.execute(
             'UPDATE asset_registry SET '
-            '  last_observed_at = now(), observed_edge_id = $2, divergent = $3 '
+            '  last_observed_at = now(), observed_edge_id = $2, divergent = $3, '
+            '  platform_variant = $4 '
             'WHERE asset_id = $1',
-            asset_id, observed_edge_id, divergent,
+            asset_id, observed_edge_id, divergent, kept_variant,
         )
         return RegistryRow(
             asset_id=asset_id,
@@ -226,4 +244,5 @@ async def upsert_observation(
             assigned_by="",  # not refreshed in the keep path
             observed_edge_id=observed_edge_id,
             divergent=divergent,
+            platform_variant=kept_variant,
         )
