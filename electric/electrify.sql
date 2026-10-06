@@ -132,6 +132,23 @@ BEGIN
 END
 $$;
 
+-- Effector tracking: effector_launch — one row per Fire/Detonation
+-- event_urn, labelled from the launcher. AssetDeepDive's EffectorTracksCard
+-- subscribes via Electric to render child tracks under the launcher. Same
+-- idempotent ALTER pattern. The declared-load table and the per-launcher
+-- counts view are not added: neither carries labels, so neither may be
+-- served.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'effector_launch'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.effector_launch;
+  END IF;
+END
+$$;
+
 -- -----------------------------------------------------------------------------
 -- 2. Replication Role — Required for ElectricSQL's logical replication
 -- -----------------------------------------------------------------------------
