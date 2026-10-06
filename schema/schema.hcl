@@ -1292,3 +1292,225 @@ table "intake_records" {
     columns = [column.kind, column.key]
   }
 }
+
+# One row per Fire or Detonation event_urn on topic `effector-events` (the
+# ingest-side DIS Fire/Detonation decode). A Fire appends the row; a matching
+# Detonation updates it in place, so "expended" is a straight SUM over this
+# table, never a reconciliation between two tables. terminal_state NULL
+# means in flight; there is deliberately no "miss" value — DIS carries no
+# such event, so an unresolved round is not the same claim as a missed one.
+# Excluded from both lifecycle pruning (build_prune_sql) and the
+# retention/TTL sweep: expended must never decrease, or `remaining` in
+# effector_launcher_counts would rebound upward with no real event behind
+# it.
+table "effector_launch" {
+  schema = schema.public
+
+  column "event_urn" {
+    type = text
+    null = false
+  }
+
+  column "launcher_asset_id" {
+    type = text
+    null = false
+  }
+
+  # The DIS munition 7-tuple, stored as "k.d.c.cat.sub.spec.extra" — nothing
+  # here groups or filters on one element of the tuple independently.
+  column "munition_type" {
+    type = text
+    null = false
+  }
+
+  column "quantity" {
+    type = int
+    null = false
+  }
+
+  column "target_asset_id" {
+    type = text
+    null = true
+  }
+
+  column "launched_at" {
+    type = timestamptz
+    null = false
+  }
+
+  # NULL = in flight. Set by a Detonation or by the timeout sweep.
+  column "terminal_state" {
+    type = text
+    null = true
+  }
+
+  # Raw DIS detonationResult enum, alongside the mapped terminal_state.
+  column "detonation_result" {
+    type = int
+    null = true
+  }
+
+  column "terminated_at" {
+    type = timestamptz
+    null = true
+  }
+
+  # true when a real Detonation resolved a row the timeout sweep had
+  # already marked 'unresolved' — a termination event outranks a timeout
+  # inference, but the fact that the inference fired first is kept.
+  column "late_terminal" {
+    type    = bool
+    null    = false
+    default = false
+  }
+
+  # Origin-node provenance — see ADR-0022. Filled from the launcher, the
+  # same way tactical_events is.
+  column "edge_id" {
+    type = text
+    null = true
+  }
+
+  column "region_id" {
+    type = text
+    null = true
+  }
+
+  # ADR-0029 releasability labels, filled exactly as tactical_events is
+  # (20260906000000_labelling_block_asset_bearing_tables.sql): carried from
+  # the launcher's own provenance, never derived here. Nullable —
+  # deny-unlabeled means an unlabelled launch is a real row, not a defect.
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.event_urn]
+  }
+
+  index "idx_effector_launch_launcher_asset_id" {
+    columns = [column.launcher_asset_id]
+  }
+
+  check "effector_launch_terminal_state_check" {
+    expr = "terminal_state IN ('entity_impact', 'ground_impact', 'detonated', 'dud', 'other', 'unresolved')"
+  }
+}
+
+# A launcher's declared load, by exact asset id OR by platform_variant
+# (never both for the same munition_type). Reloaded wholesale from
+# EFFECTOR_DECLARED_LOAD_PATH at projector startup — there is no producer
+# that writes single rows here. Deliberately left out of reset-scenario.sh's
+# TABLES array: it is config, reloaded at projector start, not scenario
+# state.
+table "effector_declared_load" {
+  schema = schema.public
+
+  column "load_key" {
+    type = text
+    null = false
+  }
+
+  column "key_kind" {
+    type = text
+    null = false
+  }
+
+  column "munition_type" {
+    type = text
+    null = false
+  }
+
+  column "declared" {
+    type = int
+    null = false
+  }
+
+  primary_key {
+    columns = [column.load_key, column.munition_type]
+  }
+
+  check "effector_declared_load_key_kind_check" {
+    expr = "key_kind IN ('asset', 'variant')"
+  }
+
+  check "effector_declared_load_declared_check" {
+    expr = "declared >= 0"
+  }
+}
+
+# Per-(launcher, munition) counts: expended, in flight, unresolved, and
+# remaining against the declared load. declared resolves asset-keyed
+# before variant-keyed (COALESCE(asset, variant) — asset is the more
+# specific fact). remaining is NULL, never 0, when declared is NULL, and is
+# never clamped at 0: negative means expended beyond the declared load,
+# which is worth keeping visible.
+view "effector_launcher_counts" {
+  schema = schema.public
+
+  column "launcher_asset_id" {
+    type = text
+  }
+  column "munition_type" {
+    type = text
+  }
+  column "expended" {
+    type = bigint
+  }
+  column "in_flight" {
+    type = bigint
+  }
+  column "unresolved" {
+    type = bigint
+  }
+  column "declared" {
+    type = int
+  }
+  column "remaining" {
+    type = bigint
+  }
+
+  as = <<-SQL
+  WITH "agg" AS (
+    SELECT
+      "launcher_asset_id",
+      "munition_type",
+      SUM("quantity")                                          AS "expended",
+      COUNT(*) FILTER (WHERE "terminal_state" IS NULL)          AS "in_flight",
+      COUNT(*) FILTER (WHERE "terminal_state" = 'unresolved')   AS "unresolved"
+    FROM "public"."effector_launch"
+    GROUP BY "launcher_asset_id", "munition_type"
+  )
+  SELECT
+      "agg"."launcher_asset_id",
+      "agg"."munition_type",
+      "agg"."expended",
+      "agg"."in_flight",
+      "agg"."unresolved",
+      COALESCE("dl_asset"."declared", "dl_variant"."declared") AS "declared",
+      COALESCE("dl_asset"."declared", "dl_variant"."declared") - "agg"."expended" AS "remaining"
+  FROM "agg"
+  LEFT JOIN "public"."telemetry_latest_state" AS "tls"
+    ON "tls"."asset_id" = "agg"."launcher_asset_id"
+  LEFT JOIN "public"."effector_declared_load" AS "dl_asset"
+    ON "dl_asset"."key_kind" = 'asset'
+    AND "dl_asset"."load_key" = "agg"."launcher_asset_id"
+    AND "dl_asset"."munition_type" = "agg"."munition_type"
+  LEFT JOIN "public"."effector_declared_load" AS "dl_variant"
+    ON "dl_variant"."key_kind" = 'variant'
+    AND "dl_variant"."load_key" = "tls"."platform_variant"
+    AND "dl_variant"."munition_type" = "agg"."munition_type"
+  SQL
+}
