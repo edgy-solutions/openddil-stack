@@ -29,7 +29,6 @@ import os
 import sys
 
 import faust
-import yaml
 
 from . import db
 from . import edge_assignment as ea
@@ -90,7 +89,7 @@ def _load_edge_assignment(path: str | None) -> None:
         return
     try:
         with open(path, "r") as f:
-            cfg = yaml.safe_load(f)
+            cfg = ea.load_yaml_no_duplicate_keys(f.read())
     except Exception as exc:
         log.error(
             "failed to read %r: %s -- falling back to unspecified-only", path, exc,
