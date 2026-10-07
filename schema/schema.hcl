@@ -551,6 +551,26 @@ table "telemetry_latest_state" {
     null = true
   }
 
+  # ADR-0044 amendment ("posture, a third column") -- independent of the two
+  # lifecycle columns above: a moving launcher is still fully operational
+  # and fully reporting. Decided once, at the edge tier that owns the
+  # sensor, by a per-asset state machine; every tier stores the decided
+  # value and none re-derives it. Does not feed readiness. Default assumes
+  # no claim, same reasoning as operational_status/reporting_status above
+  # defaulting to the common case for rows written before this migration --
+  # except here "no claim" IS the common/cold-start case, not an assumption
+  # of health.
+  column "posture_status" {
+    type    = text
+    null    = false
+    default = "unspecified"
+  }
+
+  column "posture_since" {
+    type = timestamptz
+    null = true
+  }
+
   column "provenance" {
     type    = jsonb
     null    = false
@@ -576,6 +596,10 @@ table "telemetry_latest_state" {
 
   primary_key {
     columns = [column.asset_id]
+  }
+
+  check "telemetry_latest_state_posture_status_check" {
+    expr = "posture_status IN ('unspecified', 'emplaced', 'march_ordered', 'moving', 'emplacing')"
   }
 }
 
