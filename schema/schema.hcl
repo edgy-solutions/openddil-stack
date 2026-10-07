@@ -1514,3 +1514,63 @@ view "effector_launcher_counts" {
     AND "dl_variant"."munition_type" = "agg"."munition_type"
   SQL
 }
+
+# A durable record of what the forwarder has already sent (or deliberately
+# withheld) to a destination, consulted before every send on a route that
+# sets dedupe_field. outcome 'held' is not terminal and never blocks a
+# later send; outcome 'delivered' is never downgraded back to 'held'
+# (enforced at the one place that writes the row, forwarder.py's
+# DeliveredStore). http_status/case_id are only ever set for a 'delivered'
+# row.
+table "egress_delivered_events" {
+  schema = schema.public
+
+  column "route" {
+    type = text
+    null = false
+  }
+  column "event_id" {
+    type = text
+    null = false
+  }
+  column "outcome" {
+    type = text
+    null = false
+  }
+  column "http_status" {
+    type = int
+    null = true
+  }
+  column "case_id" {
+    type = text
+    null = true
+  }
+  column "topic" {
+    type = text
+    null = false
+  }
+  column "partition" {
+    type = int
+    null = false
+  }
+  column "kafka_offset" {
+    type = bigint
+    null = false
+  }
+  column "first_recorded_at" {
+    type = timestamptz
+    null = false
+  }
+  column "recorded_at" {
+    type = timestamptz
+    null = false
+  }
+
+  primary_key {
+    columns = [column.route, column.event_id]
+  }
+
+  check "egress_delivered_events_outcome_check" {
+    expr = "outcome IN ('held', 'delivered')"
+  }
+}
