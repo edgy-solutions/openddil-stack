@@ -26,6 +26,7 @@
 --   * tactical_events           — CloudEvents alert log (Phase 4a)
 --   * asset_telemetry_windows   — per-asset windowed aggregations (Phase 4a)
 --   * edge_buffer_status        — edge->HQ DDIL link/buffer status (Phase 4c.5)
+--   * link_status               — HQ per-link reachability, role-wide
 --
 -- audit_log is HQ-only and is intentionally NOT included.
 -- -----------------------------------------------------------------------------
@@ -44,7 +45,8 @@ BEGIN
                 public.telemetry_latest_state,
                 public.tactical_events,
                 public.asset_telemetry_windows,
-                public.edge_buffer_status;
+                public.edge_buffer_status,
+                public.link_status;
   END IF;
 END
 $$;
@@ -60,6 +62,18 @@ BEGIN
     WHERE pubname = 'electric_publication' AND tablename = 'edge_buffer_status'
   ) THEN
     ALTER PUBLICATION electric_publication ADD TABLE public.edge_buffer_status;
+  END IF;
+END
+$$;
+
+-- Idempotently ensure link_status is in the publication, same pattern.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'link_status'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.link_status;
   END IF;
 END
 $$;

@@ -916,6 +916,78 @@ table "edge_buffer_status" {
 }
 
 # -----------------------------------------------------------------------------
+# HQ per-link reachability
+# -----------------------------------------------------------------------------
+# One row per tier link id (an edge id or a region id), written by HQ's link
+# monitor from the arrival of each tier's heartbeat. It holds no asset data,
+# so it carries no releasability label columns; it is served role-wide like
+# edge_buffer_status.
+# -----------------------------------------------------------------------------
+table "link_status" {
+  schema = schema.public
+
+  # The link id.
+  column "id" {
+    type = text
+    null = false
+  }
+
+  # One of up / idle / down / unknown.
+  column "link_state" {
+    type = text
+    null = false
+  }
+
+  # One of active / idle / unspecified.
+  column "traffic" {
+    type = text
+    null = false
+  }
+
+  column "declared_idle" {
+    type    = boolean
+    null    = false
+    default = false
+  }
+
+  # Seconds since the last heartbeat arrived; NULL = none seen.
+  column "heartbeat_age_s" {
+    type = double_precision
+    null = true
+  }
+
+  column "last_heartbeat_at" {
+    type = timestamptz
+    null = true
+  }
+
+  # The emitting tier's relay lag as last reported; -1 unknown.
+  column "bridge_lag" {
+    type    = bigint
+    null    = false
+    default = -1
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.id]
+  }
+
+  check "link_status_link_state_check" {
+    expr = "link_state IN ('up', 'idle', 'down', 'unknown')"
+  }
+
+  check "link_status_traffic_check" {
+    expr = "traffic IN ('active', 'idle', 'unspecified')"
+  }
+}
+
+# -----------------------------------------------------------------------------
 # Phase 6b §B: regional rollups (ADR-0023)
 # -----------------------------------------------------------------------------
 # Three per-region aggregate tables populated by the openddil-projector's new
