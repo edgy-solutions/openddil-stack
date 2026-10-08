@@ -571,6 +571,14 @@ table "telemetry_latest_state" {
     null = true
   }
 
+  # Which part of its platform the record describes, declared by the
+  # boundary mapper (AssetIdentity.subsystem; enum name as text). NULL = not
+  # declared = the platform itself (ADR-0047).
+  column "subsystem" {
+    type = text
+    null = true
+  }
+
   column "provenance" {
     type    = jsonb
     null    = false
@@ -1340,6 +1348,13 @@ table "effector_launch" {
     null = false
   }
 
+  # The Fire PDU's munition expendable entity, as an asset_id. NULL when the
+  # Fire names no distinct expendable (DIS 0:0:0).
+  column "munition_asset_id" {
+    type = text
+    null = true
+  }
+
   # The DIS munition 7-tuple, stored as "k.d.c.cat.sub.spec.extra" — nothing
   # here groups or filters on one element of the tuple independently.
   column "munition_type" {
@@ -1426,6 +1441,10 @@ table "effector_launch" {
 
   index "idx_effector_launch_launcher_asset_id" {
     columns = [column.launcher_asset_id]
+  }
+
+  index "idx_effector_launch_munition_asset_id" {
+    columns = [column.munition_asset_id]
   }
 
   check "effector_launch_terminal_state_check" {
