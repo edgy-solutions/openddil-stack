@@ -1,4 +1,4 @@
-h1:y+xMCAkkvF+0BVo+OP+PEXklCvfvSCMJz653ZJeOpqM=
+h1:KCf/NDnekBHV3tAk/mIa2NHOrRhw5zczF/p5kWfgX+k=
 20260514040446_phase4a_pipeline_tables.sql h1:xGr2G36CM3DuKCB6+75KdwqjuLN/vkHsF3gAClJsV/Q=
 20260514110726_phase4a_cm_manual_discrepancies.sql h1:mHyFISzalKwI/FPYu8L7/UIMSpytue/ryycPRaYPy9M=
 20260514150847_phase4c5_edge_buffer_status.sql h1:a81UFmgUgHpbfYXlRBueSCdWSNQCKzsurmMuFZwpjv0=
@@ -27,3 +27,4 @@ h1:y+xMCAkkvF+0BVo+OP+PEXklCvfvSCMJz653ZJeOpqM=
 20261008010000_telemetry_latest_state_subsystem.sql h1:FVHZ2EwFHsuA7kGr+hCd5gaEBk8nsMW8krwGKK+wa1s=
 20261008020000_effector_launch_munition_asset_id.sql h1:oAf74+x1A/UpFSl8q3CjrUjHJFTRx2IH+hB+/2yYOXE=
 20261009000000_link_status.sql h1:uejHR4MXEIrA4BdmcvmNZar3OSBjfSPCAPhfFEq8YCg=
+20261009010000_telemetry_windows_element_rollup.sql h1:IdM3Z2IsEwRZtcTyETjAXkI7F2lqjzuKToffsPUog38=

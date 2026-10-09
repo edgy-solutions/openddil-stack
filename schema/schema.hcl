@@ -830,6 +830,13 @@ table "asset_telemetry_windows" {
     null = true
   }
 
+  # Asset-level rollup of the per-element snapshot, derived at the owning
+  # edge. NULL for assets without an element profile.
+  column "element_rollup" {
+    type = jsonb
+    null = true
+  }
+
   column "updated_at" {
     type    = timestamptz
     null    = false
