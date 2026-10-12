@@ -57,7 +57,7 @@ class RegistryRow:
 _pool: Optional[asyncpg.Pool] = None
 
 
-async def init_pool(dsn: str, min_size: int = 2, max_size: int = 8) -> None:
+async def init_pool(dsn: str | None, min_size: int = 2, max_size: int = 8) -> None:
     """Create the pg pool. Idempotent -- safe to call multiple times in
     test setup. min/max defaults are conservative; the service does one
     upsert per asset-event so contention is low."""

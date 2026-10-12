@@ -5,8 +5,42 @@ Mirrors the env-var pattern used by openddil-tactical-agents/regional
 configured the regional aggregator.
 """
 from __future__ import annotations
+import logging
 import os
 from dataclasses import dataclass
+
+log = logging.getLogger(__name__)
+
+
+def store_dsn_from_env() -> str | None:
+    """Where the store connection comes from.
+
+    ASSET_REGISTRY_POSTGRES_DSN, if set and non-empty, is returned (docker
+    compose fallback). Otherwise, when PGHOST is non-empty the standard PG*
+    environment is the source and None is returned: asyncpg reads PGHOST/
+    PGPORT/PGDATABASE/PGUSER/PGPASSWORD/PGSSLMODE itself when given no DSN,
+    so the password never sits in a string built here. Neither set -> exit
+    non-zero; there is no credential default. The source is logged, never a
+    DSN or a password.
+    """
+    dsn = os.getenv("ASSET_REGISTRY_POSTGRES_DSN", "")
+    if dsn:
+        log.info(
+            "store connection: ASSET_REGISTRY_POSTGRES_DSN (compose fallback)")
+        return dsn
+    host = os.getenv("PGHOST", "")
+    if host:
+        log.info(
+            "store connection: PG* environment (host=%s db=%s user=%s)",
+            host, os.getenv("PGDATABASE", ""), os.getenv("PGUSER", ""),
+        )
+        return None
+    log.error(
+        "store connection not configured: set PGHOST (with PGDATABASE, "
+        "PGUSER and PGPASSWORD or PGPASSFILE) or, for docker compose, "
+        "ASSET_REGISTRY_POSTGRES_DSN"
+    )
+    raise SystemExit(2)
 
 
 @dataclass(frozen=True)
@@ -30,9 +64,9 @@ class Config:
     # subscribe to this to keep their in-memory caches current.
     output_topic: str
 
-    # Postgres DSN for the HQ instance. Same shape projector + cm-service
-    # use: postgresql://user:pass@host:5432/dbname
-    postgres_dsn: str
+    # Compose-fallback DSN for the HQ instance, or None when the standard
+    # PG* environment is the source (asyncpg reads it itself).
+    postgres_dsn: str | None
 
     # Path to the edge-assignment YAML config (FOB list + strategy chain).
     # Currently mounted at /etc/openddil/edge-assignment/edge-assignment.yaml
@@ -77,7 +111,7 @@ class Config:
                 "ASSET_REGISTRY_OUTPUT_TOPIC",
                 "asset-registry-events",
             ),
-            postgres_dsn=os.environ["ASSET_REGISTRY_POSTGRES_DSN"],
+            postgres_dsn=store_dsn_from_env(),
             edge_assignment_config=os.getenv(
                 "EDGE_ASSIGNMENT_CONFIG",
                 "/etc/openddil/edge-assignment/edge-assignment.yaml",

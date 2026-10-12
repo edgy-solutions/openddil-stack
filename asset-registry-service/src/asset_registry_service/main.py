@@ -5,7 +5,9 @@ faust-regional's main entrypoint) and starts faust.Worker with one App
 per source edge + the HQ producer sidecar.
 
 Env config (see config.py for defaults):
-  ASSET_REGISTRY_POSTGRES_DSN   -- required, no default
+  PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD (or PGPASSFILE), PGSSLMODE
+                                -- the store connection (PGHOST required)
+  ASSET_REGISTRY_POSTGRES_DSN   -- compose-only fallback; wins when set
   ASSET_REGISTRY_EDGES          -- required, comma-separated
                                    "edge-01=redpanda-edge-01:9092,
                                     edge-02=redpanda-edge-02:9092"
@@ -180,7 +182,7 @@ class _PoolInitService(faust.Service):
     avoids the asyncio.run() -> closed-loop trap that breaks Faust's
     Service.__init__ in Python 3.11+."""
 
-    def __init__(self, *, dsn: str, label: str) -> None:
+    def __init__(self, *, dsn: str | None, label: str) -> None:
         super().__init__()
         self._dsn = dsn
         self._label = label

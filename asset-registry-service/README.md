@@ -90,7 +90,8 @@ canonical list.
 
 | Env var | Required | Default | Meaning |
 |---|---|---|---|
-| `ASSET_REGISTRY_POSTGRES_DSN` | yes | — | `postgresql://user:pass@host:5432/db` |
+| `PGHOST` (+ `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` or `PGPASSFILE`, `PGSSLMODE`) | yes (or the DSN below) | — | the store connection; the password is its own secret |
+| `ASSET_REGISTRY_POSTGRES_DSN` | no | — | compose-only fallback DSN; wins when set |
 | `ASSET_REGISTRY_EDGES` | yes | — | `edge-01=redpanda-edge-01:9092,edge-02=...` |
 | `ASSET_REGISTRY_KAFKA_BROKERS` | no | `redpanda-hq:19092` | HQ brokers for publishing registry events |
 | `ASSET_REGISTRY_INPUT_TOPIC` | no | `telemetry-latest-state` | Per-edge topic to consume |
@@ -121,7 +122,7 @@ pytest src/tests/ -v
 Run the service against a local cluster:
 
 ```bash
-export ASSET_REGISTRY_POSTGRES_DSN="postgresql://postgres:password@localhost:5432/openddil"
+export PGHOST=localhost PGDATABASE=openddil PGUSER=postgres  # PGPASSWORD from your secret store
 export ASSET_REGISTRY_EDGES="edge-01=localhost:9092"
 export EDGE_ASSIGNMENT_CONFIG="./test-fixtures/edge-assignment.yaml"
 asset-registry-service
