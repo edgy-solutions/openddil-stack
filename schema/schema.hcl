@@ -994,6 +994,74 @@ table "link_status" {
   }
 }
 
+# The current row per (site, part_ref) of the parts-availability stand-in,
+# fed from the HQ-only parts-availability topic. A stand-in, not a
+# maintenance-system inventory. Absent keys stay NULL: unknown is not zero.
+table "parts_availability" {
+  schema = schema.public
+
+  column "site" {
+    type = text
+    null = false
+  }
+
+  column "part_ref" {
+    type = text
+    null = false
+  }
+
+  column "on_hand" {
+    type = int
+    null = true
+  }
+
+  column "lead_time_days" {
+    type = double_precision
+    null = true
+  }
+
+  column "nearest_site_with_stock" {
+    type = text
+    null = true
+  }
+
+  column "nearest_on_hand" {
+    type = int
+    null = true
+  }
+
+  column "source" {
+    type = text
+    null = true
+  }
+
+  # From the record's observed_at_ns.
+  column "observed_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.site, column.part_ref]
+  }
+}
+
 # -----------------------------------------------------------------------------
 # Phase 6b §B: regional rollups (ADR-0023)
 # -----------------------------------------------------------------------------
@@ -1528,6 +1596,88 @@ table "effector_launch" {
 
   check "effector_launch_terminal_state_check" {
     expr = "terminal_state IN ('entity_impact', 'ground_impact', 'detonated', 'dud', 'other', 'unresolved')"
+  }
+}
+
+# One row per supply line of a DIS Resupply Received on topic
+# `effector-events`. Append-only: a resupply is never updated or deleted.
+# Excluded from both lifecycle pruning and the retention/TTL sweep for the
+# same reason as effector_launch: a pruned resupply would make a replayed
+# `remaining` wrong. Labelled from the launcher, stamped at ingress, never
+# derived here.
+table "effector_resupply" {
+  schema = schema.public
+
+  column "event_urn" {
+    type = text
+    null = false
+  }
+
+  # The receiving launcher.
+  column "launcher_asset_id" {
+    type = text
+    null = false
+  }
+
+  column "supplier_asset_id" {
+    type = text
+    null = true
+  }
+
+  # The DIS munition 7-tuple, stored as "k.d.c.cat.sub.spec.extra" — same
+  # form as effector_launch.
+  column "munition_type" {
+    type = text
+    null = false
+  }
+
+  column "quantity" {
+    type = int
+    null = false
+  }
+
+  # The record's ingest timestamp.
+  column "received_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "edge_id" {
+    type = text
+    null = true
+  }
+
+  column "region_id" {
+    type = text
+    null = true
+  }
+
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
+
+  column "ingested_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.event_urn, column.munition_type]
+  }
+
+  index "idx_effector_resupply_launcher_asset_id" {
+    columns = [column.launcher_asset_id]
+  }
+
+  check "effector_resupply_quantity_check" {
+    expr = "quantity >= 0"
   }
 }
 

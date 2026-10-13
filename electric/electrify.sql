@@ -163,6 +163,30 @@ BEGIN
 END
 $$;
 
+-- effector_resupply: labelled from the launcher, so it may be served.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'effector_resupply'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.effector_resupply;
+  END IF;
+END
+$$;
+
+-- parts_availability: labelled with the site's nation, so it may be served.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'parts_availability'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.parts_availability;
+  END IF;
+END
+$$;
+
 -- -----------------------------------------------------------------------------
 -- 2. Replication Role — Required for ElectricSQL's logical replication
 -- -----------------------------------------------------------------------------
