@@ -231,3 +231,39 @@ $$;
 --
 -- See: https://electric-sql.com/docs/guides/shapes
 -- =============================================================================
+
+-- asset_declaration: the releasability row for a declared id (ADR-0050), labelled with its nation, so it may be served.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'asset_declaration'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.asset_declaration;
+  END IF;
+END
+$$;
+
+-- asset_correlation: serial to asset id, labelled with its nation (ADR-0050), so it may be served.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'asset_correlation'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.asset_correlation;
+  END IF;
+END
+$$;
+
+-- asset_fielding: expected arrivals, labelled with the record's nation (ADR-0050), so it may be served.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'asset_fielding'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.asset_fielding;
+  END IF;
+END
+$$;

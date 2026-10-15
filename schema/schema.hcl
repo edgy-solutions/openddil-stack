@@ -1976,3 +1976,219 @@ table "egress_delivered_events" {
     expr = "outcome IN ('held', 'delivered')"
   }
 }
+
+table "asset_declaration" {
+  schema = schema.public
+
+  column "asset_id" {
+    type = text
+    null = false
+  }
+
+  column "serial" {
+    type = text
+    null = true
+  }
+
+  column "unit" {
+    type = text
+    null = false
+  }
+
+  column "originator_nation" {
+    type = text
+    null = false
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = false
+    default = sql("'{}'")
+  }
+
+  column "baseline_id" {
+    type = text
+    null = true
+  }
+
+  column "declared_by" {
+    type = text
+    null = false
+  }
+
+  column "declared_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "source" {
+    type = text
+    null = false
+  }
+
+  column "edge_id" {
+    type = text
+    null = false
+  }
+
+  column "region_id" {
+    type = text
+    null = true
+  }
+
+  column "owning_tier" {
+    type = text
+    null = false
+  }
+
+  column "updated_at" {
+    type = timestamptz
+    null = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.asset_id]
+  }
+
+  index "idx_asset_declaration_edge_id" {
+    columns = [column.edge_id]
+  }
+
+  check "asset_declaration_source_check" {
+    expr = "source IN ('declare', 'expect-confirm')"
+  }
+}
+
+table "asset_correlation" {
+  schema = schema.public
+
+  column "serial" {
+    type = text
+    null = false
+  }
+
+  column "asset_id" {
+    type = text
+    null = false
+  }
+
+  column "edge_id" {
+    type = text
+    null = false
+  }
+
+  column "region_id" {
+    type = text
+    null = true
+  }
+
+  column "originator_nation" {
+    type = text
+    null = false
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = false
+    default = sql("'{}'")
+  }
+
+  column "declared_by" {
+    type = text
+    null = false
+  }
+
+  column "declared_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "source" {
+    type = text
+    null = false
+  }
+
+  column "updated_at" {
+    type = timestamptz
+    null = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.serial]
+  }
+
+  index "idx_asset_correlation_asset_id" {
+    unique  = true
+    columns = [column.asset_id]
+  }
+
+  check "asset_correlation_source_check" {
+    expr = "source IN ('declare', 'expect-confirm')"
+  }
+}
+
+table "asset_fielding" {
+  schema = schema.public
+
+  column "serial" {
+    type = text
+    null = false
+  }
+
+  column "platform_variant" {
+    type = text
+    null = false
+  }
+
+  column "unit" {
+    type = text
+    null = false
+  }
+
+  column "originator_nation" {
+    type = text
+    null = false
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = false
+    default = sql("'{}'")
+  }
+
+  column "fielded_to" {
+    type = text
+    null = false
+  }
+
+  column "region_id" {
+    type = text
+    null = true
+  }
+
+  column "due_by" {
+    type = timestamptz
+    null = false
+  }
+
+  column "recorded_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "updated_at" {
+    type = timestamptz
+    null = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.serial]
+  }
+
+  index "idx_asset_fielding_fielded_to" {
+    columns = [column.fielded_to]
+  }
+}
