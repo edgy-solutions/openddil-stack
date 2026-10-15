@@ -1681,6 +1681,136 @@ table "effector_resupply" {
   }
 }
 
+# One row per in-flight munition, keyed by the munition's own DIS id (never
+# an asset). Updated in place as samples arrive. Excluded from both lifecycle
+# pruning and the retention/TTL sweep, like effector_launch. Labelled from the
+# launcher once the Fire is joined (ADR-0049). `silent` is a track state on
+# this tier's own arrival clock (last_heard_at), never a launch outcome.
+table "munition_track" {
+  schema = schema.public
+
+  column "munition_asset_id" {
+    type = text
+    null = false
+  }
+
+  column "launcher_asset_id" {
+    type = text
+    null = true
+  }
+
+  column "event_urn" {
+    type = text
+    null = true
+  }
+
+  # The DIS munition 7-tuple, "k.d.c.cat.sub.spec.extra" — same form as
+  # effector_launch.
+  column "munition_type" {
+    type = text
+    null = false
+  }
+
+  column "ecef_x" {
+    type = double_precision
+    null = false
+  }
+
+  column "ecef_y" {
+    type = double_precision
+    null = false
+  }
+
+  column "ecef_z" {
+    type = double_precision
+    null = false
+  }
+
+  column "first_seen_at" {
+    type = timestamptz
+    null = false
+  }
+
+  # The latest sample's time, on the edge clock.
+  column "last_sample_at" {
+    type = timestamptz
+    null = false
+  }
+
+  # This tier's arrival clock; the silence sweep reads only this.
+  column "last_heard_at" {
+    type = timestamptz
+    null = false
+  }
+
+  # NULL = in flight.
+  column "terminal_state" {
+    type = text
+    null = true
+  }
+
+  # The raw DIS detonation result enum.
+  column "detonation_result" {
+    type = int
+    null = true
+  }
+
+  column "terminated_at" {
+    type = timestamptz
+    null = true
+  }
+
+  # A Detonation that arrived after the track was marked silent.
+  column "late_terminal" {
+    type    = boolean
+    null    = false
+    default = false
+  }
+
+  column "edge_id" {
+    type = text
+    null = true
+  }
+
+  column "region_id" {
+    type = text
+    null = true
+  }
+
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
+
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.munition_asset_id]
+  }
+
+  index "idx_munition_track_launcher_asset_id" {
+    columns = [column.launcher_asset_id]
+  }
+
+  index "idx_munition_track_in_flight" {
+    columns = [column.last_heard_at]
+    where   = "terminal_state IS NULL"
+  }
+
+  check "munition_track_terminal_state_check" {
+    expr = "terminal_state IN ('entity_impact', 'ground_impact', 'detonated', 'dud', 'other', 'silent')"
+  }
+}
+
 # A launcher's declared load, by exact asset id OR by platform_variant
 # (never both for the same munition_type). Reloaded wholesale from
 # EFFECTOR_DECLARED_LOAD_PATH at projector startup — there is no producer

@@ -175,6 +175,19 @@ BEGIN
 END
 $$;
 
+-- munition_track: labelled from the launcher once the Fire is joined
+-- (ADR-0049), so it may be served.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'munition_track'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.munition_track;
+  END IF;
+END
+$$;
+
 -- parts_availability: labelled with the site's nation, so it may be served.
 DO $$
 BEGIN
