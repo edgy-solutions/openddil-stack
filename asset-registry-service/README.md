@@ -39,6 +39,13 @@ For each telemetry event it observes:
 4. Publish a JSON event to `asset-registry-events` (HQ broker) keyed
    by asset_id, so consumer caches (cm-service, logistics-fusion,
    faust-regional source-app, projector) stay current via pub/sub.
+   The upsert runs on every observation, but the event is published
+   only when it is the first for that asset in this process, when the
+   payload differs from the last one successfully sent, or when
+   `ASSET_REGISTRY_REPUBLISH_SECONDS` (default 300) have passed since
+   the last successful send. A failed send is retried on the next
+   observation. The cache is in memory, so a restart re-publishes each
+   asset on its first observation.
 
 The service NEVER overrides a static (warfighter) assignment. When
 the warfighter's assignment disagrees with reality, the row's
@@ -96,6 +103,7 @@ canonical list.
 | `ASSET_REGISTRY_KAFKA_BROKERS` | no | `redpanda-hq:19092` | HQ brokers for publishing registry events |
 | `ASSET_REGISTRY_INPUT_TOPIC` | no | `telemetry-latest-state` | Per-edge topic to consume |
 | `ASSET_REGISTRY_OUTPUT_TOPIC` | no | `asset-registry-events` | HQ topic for changelog |
+| `ASSET_REGISTRY_REPUBLISH_SECONDS` | no | `300` | Per-asset re-publish interval for unchanged registry events; `0` publishes every observation; negative or non-numeric fails at startup |
 | `EDGE_ASSIGNMENT_CONFIG` | no | `/etc/openddil/edge-assignment/edge-assignment.yaml` | Same path projector uses |
 | `ASSET_REGISTRY_APP_ID` | no | `asset-registry-service` | Faust App ID prefix |
 | `ASSET_REGISTRY_WEB_PORT` | no | `6070` | Base Faust web port; per-edge apps use port + index |

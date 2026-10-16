@@ -15,6 +15,9 @@ Env config (see config.py for defaults):
                                    events. Default "redpanda-hq:19092"
   ASSET_REGISTRY_INPUT_TOPIC    -- default "telemetry-latest-state"
   ASSET_REGISTRY_OUTPUT_TOPIC   -- default "asset-registry-events"
+  ASSET_REGISTRY_REPUBLISH_SECONDS -- default 300. Registry events publish on
+                                   change, and again after this many seconds
+                                   per asset. 0 = publish every observation.
   EDGE_ASSIGNMENT_CONFIG        -- path to edge-assignment.yaml.
                                    Default /etc/openddil/edge-assignment/edge-assignment.yaml
   LOG_LEVEL                     -- default "INFO"
@@ -39,6 +42,23 @@ from .registry_app import _HqProducerService, make_edge_app
 
 
 log = logging.getLogger("asset_registry_service.main")
+
+
+def _parse_republish_seconds(value: "str | None") -> float:
+    """ASSET_REGISTRY_REPUBLISH_SECONDS: default 300; 0 = every observation."""
+    if value is None or value.strip() == "":
+        return 300.0
+    try:
+        seconds = float(value)
+    except ValueError:
+        raise RuntimeError(
+            f"ASSET_REGISTRY_REPUBLISH_SECONDS must be a number >= 0, got {value!r}"
+        ) from None
+    if not (seconds >= 0) or seconds == float("inf"):
+        raise RuntimeError(
+            f"ASSET_REGISTRY_REPUBLISH_SECONDS must be a finite number >= 0, got {value!r}"
+        )
+    return seconds
 
 
 def _parse_edges(spec: str) -> list[tuple[str, str]]:
@@ -129,6 +149,10 @@ def main() -> int:
         [e[0] for e in edges], cfg.kafka_brokers, cfg.input_topic, cfg.output_topic,
     )
 
+    republish_seconds = _parse_republish_seconds(
+        os.environ.get("ASSET_REGISTRY_REPUBLISH_SECONDS")
+    )
+
     _load_edge_assignment(cfg.edge_assignment_config)
 
     # NOTE: db.init_pool is intentionally NOT called via asyncio.run() here.
@@ -161,6 +185,7 @@ def main() -> int:
             hq_producer=hq_producer,
             web_port=port,
             static_region=cfg.edge_regions.get(edge_id),
+            republish_seconds=republish_seconds,
         ))
 
     primary, *secondaries = apps

@@ -19,7 +19,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Optional
+import time
+from typing import Callable, Optional
 
 import aiokafka
 import faust
@@ -149,6 +150,140 @@ def _try_decode_event(raw: bytes) -> Optional[dict]:
         return None
 
 
+class _PublishGate:
+    """Decides whether a registry event needs publishing.
+
+    Per asset_id, remembers the last payload successfully sent and when.
+    due() is true for a never-seen asset, a changed payload, or when
+    republish_seconds have elapsed since the last successful send
+    (0 = always due). Callers record a send with mark_sent() only after
+    the send returned without raising. In-memory: a restart publishes
+    every asset again on its first observation.
+    """
+
+    def __init__(self, republish_seconds: float = 300.0) -> None:
+        self.republish_seconds = republish_seconds
+        self._last: dict[str, tuple[bytes, float]] = {}
+
+    def due(self, asset_id: str, payload: bytes, now: float) -> bool:
+        last = self._last.get(asset_id)
+        if last is None:
+            return True
+        last_payload, last_time = last
+        if payload != last_payload:
+            return True
+        return (now - last_time) >= self.republish_seconds
+
+    def mark_sent(self, asset_id: str, payload: bytes, now: float) -> None:
+        self._last[asset_id] = (payload, now)
+
+
+async def _handle_observation(
+    raw: bytes,
+    *,
+    edge_id: str,
+    static_region: Optional[str],
+    output_topic: str,
+    hq_producer,
+    gate: _PublishGate,
+    clock: Callable[[], float] = time.monotonic,
+    db=db,
+    ea=ea,
+) -> None:
+    """Process one telemetry record: upsert always, publish when due."""
+    event = _try_decode_event(raw)
+    if event is None:
+        # Couldn't extract asset_id -- skip silently. Unknown
+        # shapes are noise here; the projector is the
+        # authoritative consumer of EntityTelemetryEvent.
+        return
+    asset_id = event["asset_id"]
+    lat = event.get("lat")
+    lon = event.get("lon")
+
+    # Run the configured assignment strategy. resolve_for()
+    # always returns an EdgeAssignment -- the strategy chain
+    # falls back to the configured fallback (typically
+    # edge-unspecified / region-unspecified) when no strategy
+    # in the chain succeeds.
+    result = ea.resolve_for(
+        asset_id=asset_id, lat=lat, lon=lon,
+        handler_label=f"asset-registry/{edge_id}",
+    )
+
+    # Decide the assignment_source label for postgres. The chain
+    # may have fired any strategy -- we map back to one of the
+    # ADR-0028-defined source values for the registry row.
+    method = result.derivation_basis.get("method", "")
+    if method in ("nearest_fob",):
+        proposed_source = "position"
+    elif method == "static_map":
+        # static_map is operator-supplied static config -- it
+        # ARRIVES via YAML, not telemetry observation, so treat
+        # it as a static assignment for priority purposes.
+        proposed_source = "static"
+    else:
+        proposed_source = "unspecified"
+
+    # Static region override for the "no overlay" path. When
+    # edge_assignment hit its fallback (chain empty / no match)
+    # and the operator provided a per-edge static_region, use
+    # that instead of the configured fallback region. Marked as
+    # "connection" source (priority between position and
+    # unspecified) so a real overlay-driven assignment still
+    # wins per ADR-0028.
+    proposed_region = result.region_id
+    if static_region and proposed_source == "unspecified":
+        proposed_region = static_region
+        proposed_source = "connection"
+
+    try:
+        row = await db.upsert_observation(
+            asset_id=asset_id,
+            observed_edge_id=edge_id,
+            proposed_edge_id=result.edge_id,
+            proposed_region_id=proposed_region,
+            proposed_source=proposed_source,
+            proposed_by=f"edge_assignment.yaml/{method}",
+            originator_nation=event.get("originator_nation") or "",
+            releasable_to=event.get("releasable_to") or [],
+            platform_variant=event.get("platform_variant") or "",
+        )
+    except Exception as exc:
+        log.error("upsert failed for %s: %s", asset_id, exc)
+        return
+
+    # Publish (on change, or every republish_seconds) to
+    # asset-registry-events on HQ broker. Consumers
+    # (cm-service, logistics-fusion, faust-regional source-app,
+    # projector) subscribe to this topic to keep their caches
+    # current per ADR-0028.
+    payload = json.dumps({
+        "asset_id": row.asset_id,
+        "edge_id": row.edge_id,
+        "region_id": row.region_id,
+        "assignment_source": row.assignment_source,
+        "observed_edge_id": row.observed_edge_id,
+        "divergent": row.divergent,
+        "platform_variant": row.platform_variant,
+    }).encode("utf-8")
+    now = clock()
+    if not gate.due(asset_id, payload, now):
+        return
+    try:
+        # produces: "${ASSET_REGISTRY_OUTPUT_TOPIC:-asset-registry-events}"
+        await hq_producer.send(output_topic, key=asset_id, value=payload)
+    except Exception as exc:
+        # A failed publish is recoverable -- the row IS in
+        # postgres; consumers will catch up at startup via the
+        # bulk SELECT. Nothing was recorded in the gate, so the next
+        # observation retries even if byte-identical, and the periodic
+        # re-publish covers consumers that missed an event.
+        log.warning("publish failed for %s: %s", asset_id, exc)
+    else:
+        gate.mark_sent(asset_id, payload, now)
+
+
 # ---------------------------------------------------------------------------
 # Per-edge App factory.
 # ---------------------------------------------------------------------------
@@ -161,6 +296,7 @@ def make_edge_app(
     hq_producer: _HqProducerService,
     web_port: int,
     static_region: Optional[str] = None,
+    republish_seconds: float = 300.0,
 ) -> faust.App:
     """Build a Faust App bound to ONE edge broker.
 
@@ -168,7 +304,8 @@ def make_edge_app(
       * decode asset_id + (lat, lon)
       * run edge_assignment to compute proposed (edge_id, region_id)
       * upsert into asset_registry (postgres) per ADR-0028 priority rules
-      * publish the resulting row to asset-registry-events on HQ
+      * publish the resulting row to asset-registry-events on HQ, only
+        when it changed or republish_seconds have passed (0 = always)
 
     static_region: optional fallback region_id used when
     edge_assignment yields the configured fallback (no FOB list / no
@@ -177,6 +314,7 @@ def make_edge_app(
     result always wins -- this is strictly a backstop for the
     "no overlay" path.
     """
+    gate = _PublishGate(republish_seconds)
     app_id = f"asset-registry-{edge_id}"
     app = faust.App(
         app_id,
@@ -190,91 +328,14 @@ def make_edge_app(
     @app.agent(in_topic)
     async def on_telemetry(stream):
         async for raw in stream:
-            if not raw:
-                continue
-            event = _try_decode_event(raw)
-            if event is None:
-                # Couldn't extract asset_id -- skip silently. Unknown
-                # shapes are noise here; the projector is the
-                # authoritative consumer of EntityTelemetryEvent.
-                continue
-            asset_id = event["asset_id"]
-            lat = event.get("lat")
-            lon = event.get("lon")
-
-            # Run the configured assignment strategy. resolve_for()
-            # always returns an EdgeAssignment -- the strategy chain
-            # falls back to the configured fallback (typically
-            # edge-unspecified / region-unspecified) when no strategy
-            # in the chain succeeds.
-            result = ea.resolve_for(
-                asset_id=asset_id, lat=lat, lon=lon,
-                handler_label=f"asset-registry/{edge_id}",
+            await _handle_observation(
+                raw,
+                edge_id=edge_id,
+                static_region=static_region,
+                output_topic=output_topic,
+                hq_producer=hq_producer,
+                gate=gate,
             )
-
-            # Decide the assignment_source label for postgres. The chain
-            # may have fired any strategy -- we map back to one of the
-            # ADR-0028-defined source values for the registry row.
-            method = result.derivation_basis.get("method", "")
-            if method in ("nearest_fob",):
-                proposed_source = "position"
-            elif method == "static_map":
-                # static_map is operator-supplied static config -- it
-                # ARRIVES via YAML, not telemetry observation, so treat
-                # it as a static assignment for priority purposes.
-                proposed_source = "static"
-            else:
-                proposed_source = "unspecified"
-
-            # Static region override for the "no overlay" path. When
-            # edge_assignment hit its fallback (chain empty / no match)
-            # and the operator provided a per-edge static_region, use
-            # that instead of the configured fallback region. Marked as
-            # "connection" source (priority between position and
-            # unspecified) so a real overlay-driven assignment still
-            # wins per ADR-0028.
-            proposed_region = result.region_id
-            if static_region and proposed_source == "unspecified":
-                proposed_region = static_region
-                proposed_source = "connection"
-
-            try:
-                row = await db.upsert_observation(
-                    asset_id=asset_id,
-                    observed_edge_id=edge_id,
-                    proposed_edge_id=result.edge_id,
-                    proposed_region_id=proposed_region,
-                    proposed_source=proposed_source,
-                    proposed_by=f"edge_assignment.yaml/{method}",
-                    originator_nation=event.get("originator_nation") or "",
-                    releasable_to=event.get("releasable_to") or [],
-                    platform_variant=event.get("platform_variant") or "",
-                )
-            except Exception as exc:
-                log.error("upsert failed for %s: %s", asset_id, exc)
-                continue
-
-            # Publish to asset-registry-events on HQ broker. Consumers
-            # (cm-service, logistics-fusion, faust-regional source-app,
-            # projector) subscribe to this topic to keep their caches
-            # current per ADR-0028.
-            payload = json.dumps({
-                "asset_id": row.asset_id,
-                "edge_id": row.edge_id,
-                "region_id": row.region_id,
-                "assignment_source": row.assignment_source,
-                "observed_edge_id": row.observed_edge_id,
-                "divergent": row.divergent,
-                "platform_variant": row.platform_variant,
-            }).encode("utf-8")
-            try:
-                # produces: "${ASSET_REGISTRY_OUTPUT_TOPIC:-asset-registry-events}"
-                await hq_producer.send(output_topic, key=asset_id, value=payload)
-            except Exception as exc:
-                # A failed publish is recoverable -- the row IS in
-                # postgres; consumers will catch up at startup via the
-                # bulk SELECT, or on the next observation publish.
-                log.warning("publish failed for %s: %s", asset_id, exc)
 
     # Faust requires agents to be named in the module scope so the
     # @app.agent decorator-registered function isn't garbage-collected.
