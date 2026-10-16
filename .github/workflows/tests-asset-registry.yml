@@ -26,9 +26,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      # The test is an AST scan plus config.py, which imports only the stdlib: it needs pytest and pyyaml,
-      # not the service's dependency tree.
+      # The test is an AST scan plus config.py (stdlib only), but the component conftest imports db, which needs asyncpg;
+      # the rest of the service dependency tree is not needed.
       - name: Install
-        run: pip install pytest "pyyaml>=6.0"
+        run: pip install pytest "pyyaml>=6.0" "asyncpg>=0.28.0"
       - name: produces manifest equals the code
         run: python -m pytest -q asset-registry-service/src/tests/test_produces_manifest.py
