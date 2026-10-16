@@ -268,6 +268,7 @@ def make_edge_app(
                 "platform_variant": row.platform_variant,
             }).encode("utf-8")
             try:
+                # produces: "${ASSET_REGISTRY_OUTPUT_TOPIC:-asset-registry-events}"
                 await hq_producer.send(output_topic, key=asset_id, value=payload)
             except Exception as exc:
                 # A failed publish is recoverable -- the row IS in

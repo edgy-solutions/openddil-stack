@@ -1,0 +1,34 @@
+name: Tests (asset-registry)
+
+# The produces manifest (produces.yaml) must equal what the asset-registry-service code can write,
+# so a new send site or topic fails here in the PR that adds it.
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "asset-registry-service/**"
+      - "produces.yaml"
+      - "produces_manifest.py"
+      - ".github/workflows/tests-asset-registry.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "asset-registry-service/**"
+      - "produces.yaml"
+      - "produces_manifest.py"
+      - ".github/workflows/tests-asset-registry.yml"
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # The test is an AST scan plus config.py, which imports only the stdlib: it needs pytest and pyyaml,
+      # not the service's dependency tree.
+      - name: Install
+        run: pip install pytest "pyyaml>=6.0"
+      - name: produces manifest equals the code
+        run: python -m pytest -q asset-registry-service/src/tests/test_produces_manifest.py
