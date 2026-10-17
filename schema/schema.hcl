@@ -1726,6 +1726,14 @@ table "munition_track" {
     null = false
   }
 
+  # The last <=10 ECEF samples, flat [x0,y0,z0, x1,y1,z1, ...], oldest first,
+  # the last triple equal to ecef_x/y/z. NULL on rows written before the
+  # migration or by a projector that predates it (ADR-0049).
+  column "trail_ecef" {
+    type = sql("double precision[]")
+    null = true
+  }
+
   column "first_seen_at" {
     type = timestamptz
     null = false

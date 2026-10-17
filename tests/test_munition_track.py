@@ -38,3 +38,19 @@ def test_check_vocabulary_matches_projector():
     assert _states(MIGRATION) == PROJECTOR_STATES
     block = HCL[HCL.index('table "munition_track"'):]
     assert _states(block) == PROJECTOR_STATES
+
+
+def test_trail_ecef_column_migrated_and_declared():
+    mig = (
+        ROOT / "schema" / "migrations" / "20261016000000_munition_track_trail.sql"
+    ).read_text(encoding="utf-8")
+    assert re.search(
+        r'ALTER TABLE "public"\."munition_track" ADD COLUMN "trail_ecef" '
+        r"double precision\[\] NULL",
+        mig,
+    )
+    block = HCL.split('table "munition_track"', 1)[1]
+    m = re.search(r'column "trail_ecef" \{(.*?)\n  \}', block, re.S)
+    assert m, "trail_ecef missing from schema.hcl munition_track"
+    assert 'sql("double precision[]")' in m.group(1)
+    assert "null = true" in m.group(1)
