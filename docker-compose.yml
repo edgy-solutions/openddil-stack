@@ -138,6 +138,13 @@ services:
   restate:
     image: restatedev/restate:latest
     container_name: openddil-restate
+    # Same shape as the chart: a container limit, and a RocksDB budget well
+    # under half of it. Unset, Restate's RocksDB budget is 2 GiB, the whole
+    # limit, and its block cache (an LRU) fills toward it whatever the data.
+    mem_limit: 2g
+    environment:
+      # 512 MiB in plain bytes, the form the chart renders.
+      RESTATE_ROCKSDB_TOTAL_MEMORY_SIZE: "536870912"
     ports:
       - "8080:8080"       # Ingress (send invocations here)
       - "9070:9070"       # Admin API (register deployments here)
