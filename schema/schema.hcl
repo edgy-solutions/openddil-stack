@@ -1975,9 +1975,32 @@ table "egress_delivered_events" {
     type = timestamptz
     null = false
   }
+  # What the event was about, read by the forwarder from the body through
+  # the kind's declared pointers. NULL when the kind declares none, the
+  # pointer does not resolve, or the row predates these columns.
+  column "episode_id" {
+    type = text
+    null = true
+  }
+  column "asset_id" {
+    type = text
+    null = true
+  }
+  column "component" {
+    type = text
+    null = true
+  }
+  column "fault_code" {
+    type = text
+    null = true
+  }
 
   primary_key {
     columns = [column.route, column.event_id]
+  }
+
+  index "egress_delivered_events_route_asset_idx" {
+    columns = [column.route, column.asset_id]
   }
 
   check "egress_delivered_events_outcome_check" {
