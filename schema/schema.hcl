@@ -1347,7 +1347,7 @@ table "asset_element_telemetry" {
     null = false
   }
 
-  # Denormalized from elements/operational so per-type filters
+  # Denormalized so per-type filters
   # ("how many MRADs are degraded") don't need JSONB unpacking.
   column "platform_variant" {
     type    = text
@@ -1360,21 +1360,10 @@ table "asset_element_telemetry" {
     default = ""
   }
 
-  # JSON array per logistics-sim publisher envelope:
-  #   [{element_id, layer_depth, layer_name, health, temp_c, load_pct,
-  #     tx_active, rx_active}, ...]
-  # element_id format documented in openddil-logistics-sim/README.md;
-  # must match the frontend SensorArrayView byte-for-byte.
-  column "elements" {
-    type    = jsonb
-    null    = false
-    default = "[]"
-  }
-
   # Mirror of the customer feed's OperationalState (power_state,
   # health_state, actively_transmitting, actively_receiving, degraded).
   # Lets a consumer render the asset-level status banner without
-  # unpacking the elements array.
+  # unpacking per-element state.
   column "operational" {
     type    = jsonb
     null    = false
@@ -1407,6 +1396,133 @@ table "asset_element_telemetry" {
 
   primary_key {
     columns = [column.asset_id]
+  }
+}
+
+# asset_element_state -- one row per (asset, element), written only when the
+# element changes. Replaces the per-tick elements array that was rewritten
+# into a synced shape on asset_element_telemetry. See migration
+# 20261031000000_asset_element_state.sql. The table exists at every tier
+# (one schema); only the edge projector writes it, and element rows are not
+# forwarded above the owning tier.
+table "asset_element_state" {
+  schema = schema.public
+
+  column "asset_id" {
+    type = text
+    null = false
+  }
+  column "element_path" {
+    type = text
+    null = false
+  }
+  column "parent_path" {
+    type = text
+    null = true
+  }
+  column "depth" {
+    type = smallint
+    null = false
+  }
+  column "layer_name" {
+    type = text
+    null = true
+  }
+
+  # Value class: written on a deadband crossing.
+  column "health" {
+    type = double_precision
+    null = true
+  }
+  column "health_band" {
+    type = text
+    null = true
+  }
+  column "temp_c" {
+    type = double_precision
+    null = true
+  }
+  column "load_pct" {
+    type = double_precision
+    null = true
+  }
+
+  # Transition class: written on any change.
+  column "tx_active" {
+    type = boolean
+    null = true
+  }
+  column "rx_active" {
+    type = boolean
+    null = true
+  }
+  column "moved_by" {
+    type = text
+    null = true
+  }
+
+  column "value_changes" {
+    type    = bigint
+    null    = false
+    default = 0
+  }
+  column "subtree_changes" {
+    type    = bigint
+    null    = false
+    default = 0
+  }
+  column "subtree_changes_window" {
+    type    = integer
+    null    = false
+    default = 0
+  }
+
+  # Sample time of the reading that caused the write, i.e. of the change.
+  column "observed_at" {
+    type = timestamptz
+    null = false
+  }
+  column "updated_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  # ADR-0029 releasability labels, typed as on asset_element_telemetry.
+  column "originator_nation" {
+    type = text
+    null = true
+  }
+  column "releasable_to" {
+    type = sql("text[]")
+    null = true
+  }
+
+  # Declared producing tier; never parsed.
+  column "provenance" {
+    type    = jsonb
+    null    = false
+    default = "{}"
+  }
+
+  primary_key {
+    columns = [column.asset_id, column.element_path]
+  }
+
+  index "asset_element_state_asset_depth_idx" {
+    columns = [column.asset_id, column.depth]
+  }
+
+  # text_pattern_ops so `element_path LIKE 'prefix/%'` snapshot queries use
+  # the index regardless of the database collation.
+  index "asset_element_state_asset_path_prefix_idx" {
+    on {
+      column = column.asset_id
+    }
+    on {
+      column = column.element_path
+      ops    = text_pattern_ops
+    }
   }
 }
 

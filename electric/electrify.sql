@@ -146,6 +146,21 @@ BEGIN
 END
 $$;
 
+-- asset_element_state: change-only per-element rows written by the edge
+-- projector; replaces the per-tick elements array on
+-- asset_element_telemetry. Created at every tier (one schema) but written
+-- only at the edge. Same idempotent ALTER pattern.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'electric_publication' AND tablename = 'asset_element_state'
+  ) THEN
+    ALTER PUBLICATION electric_publication ADD TABLE public.asset_element_state;
+  END IF;
+END
+$$;
+
 -- Effector tracking: effector_launch — one row per Fire/Detonation
 -- event_urn, labelled from the launcher. AssetDeepDive's EffectorTracksCard
 -- subscribes via Electric to render child tracks under the launcher. Same
