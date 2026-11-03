@@ -353,3 +353,134 @@ async def test_replace_path_empty_observation_does_not_clear_variant(fake_pool_e
         proposed_by="warfighter-ui",
     )
     assert row.platform_variant == "variant-old"
+
+
+# ---------------------------------------------------------------------------
+# Labels: relabel on a positive statement, never clear (ADR-0029 s3,
+# ADR-0050 s2). The fake records SQL + params; it cannot run the UPDATE, so
+# these assert which label columns/values were written, not Postgres typing.
+# ---------------------------------------------------------------------------
+
+def _keep_row():
+    return {
+        "edge_id": "edge-01",
+        "region_id": "region-east",
+        "assignment_source": "static",
+        "platform_variant": "",
+    }
+
+
+def _replace_row():
+    return {
+        "edge_id": "edge-02",
+        "region_id": "region-west",
+        "assignment_source": "position",
+        "platform_variant": "",
+    }
+
+
+async def _keep(**labels):
+    return await db.upsert_observation(
+        asset_id="ASSET-A",
+        observed_edge_id="edge-01",
+        proposed_edge_id="edge-01",
+        proposed_region_id="region-east",
+        proposed_source="position",
+        proposed_by="edge_assignment.yaml/nearest_fob",
+        **labels,
+    )
+
+
+async def _replace(**labels):
+    return await db.upsert_observation(
+        asset_id="ASSET-A",
+        observed_edge_id="edge-02",
+        proposed_edge_id="edge-01",
+        proposed_region_id="region-east",
+        proposed_source="static",
+        proposed_by="warfighter-ui",
+        **labels,
+    )
+
+
+@pytest.mark.asyncio
+async def test_keep_path_relabels_on_nation(fake_pool_existing):
+    _, conn = fake_pool_existing
+    conn.seeded_row = _keep_row()
+    await _keep(originator_nation="BDR", releasable_to=["BDR", "ATL"])
+    sql, args = conn.executed[0]
+    assert "originator_nation = $5" in sql and "releasable_to = $6" in sql
+    assert args[4] == "BDR"
+    assert args[5] == ["BDR", "ATL"]
+
+
+@pytest.mark.asyncio
+async def test_keep_path_empty_nation_leaves_labels_alone(fake_pool_existing):
+    _, conn = fake_pool_existing
+    conn.seeded_row = _keep_row()
+    await _keep(originator_nation="", releasable_to=["ATL"])
+    sql, args = conn.executed[0]
+    assert "originator_nation" not in sql and "releasable_to" not in sql
+    assert ["ATL"] not in args and len(args) == 4
+
+
+@pytest.mark.asyncio
+async def test_keep_path_nation_with_empty_releasable_writes_empty_array(
+    fake_pool_existing,
+):
+    _, conn = fake_pool_existing
+    conn.seeded_row = _keep_row()
+    await _keep(originator_nation="BDR", releasable_to=[])
+    sql, args = conn.executed[0]
+    assert "releasable_to = $6" in sql
+    assert args[4] == "BDR"
+    assert args[5] == []
+
+
+@pytest.mark.asyncio
+async def test_replace_path_relabels_on_nation(fake_pool_existing):
+    _, conn = fake_pool_existing
+    conn.seeded_row = _replace_row()
+    await _replace(originator_nation="BDR", releasable_to=["BDR", "ATL"])
+    sql, args = conn.executed[0]
+    assert "assigned_at = now()" in sql  # really the replace path
+    assert "originator_nation = $9" in sql and "releasable_to = $10" in sql
+    assert args[8] == "BDR"
+    assert args[9] == ["BDR", "ATL"]
+
+
+@pytest.mark.asyncio
+async def test_replace_path_empty_nation_leaves_labels_alone(fake_pool_existing):
+    _, conn = fake_pool_existing
+    conn.seeded_row = _replace_row()
+    await _replace(originator_nation="", releasable_to=["ATL"])
+    sql, args = conn.executed[0]
+    assert "assigned_at = now()" in sql
+    assert "originator_nation" not in sql and "releasable_to" not in sql
+    assert ["ATL"] not in args and len(args) == 8
+
+
+@pytest.mark.asyncio
+async def test_replace_path_nation_with_empty_releasable_writes_empty_array(
+    fake_pool_existing,
+):
+    _, conn = fake_pool_existing
+    conn.seeded_row = _replace_row()
+    await _replace(originator_nation="BDR", releasable_to=[])
+    sql, args = conn.executed[0]
+    assert "releasable_to = $10" in sql
+    assert args[8] == "BDR"
+    assert args[9] == []
+
+
+@pytest.mark.asyncio
+async def test_stamped_row_takes_declared_nation(fake_pool_existing):
+    """First seen under a rule stamp (ATL), declared later as BDR: the
+    declared nation is written. The fake cannot hold the table's ATL stamp,
+    so this asserts the UPDATE carries the declared values unconditionally."""
+    _, conn = fake_pool_existing
+    conn.seeded_row = _keep_row()
+    await _keep(originator_nation="BDR", releasable_to=["BDR"])
+    sql, args = conn.executed[0]
+    assert "originator_nation = $5" in sql
+    assert args[4] == "BDR" and args[5] == ["BDR"]

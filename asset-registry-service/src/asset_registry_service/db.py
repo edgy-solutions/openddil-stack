@@ -112,20 +112,27 @@ async def upsert_observation(
       proposed_by:     audit field (e.g. "edge_assignment.yaml")
       originator_nation, releasable_to:
                        ADR-0029 labels from the OBSERVATION's provenance.
-                       Stamped on INSERT and never re-derived. Absent labels
-                       are written as NULL rather than as an empty claim --
-                       "we were not told" must stay distinguishable from
-                       "released to nobody", and the completeness gate counts
-                       them differently.
+                       Stamped on INSERT; after that they are relabelled on a
+                       positive statement and never cleared (ADR-0029 s3,
+                       ADR-0050 s2). A non-empty originator_nation sets BOTH
+                       columns to this observation's values (an empty
+                       releasable_to beside a nation is a statement and
+                       writes {}). An empty originator_nation leaves both
+                       columns as they are, whatever releasable_to says. On
+                       INSERT, absent labels are written as NULL rather than
+                       as an empty claim -- "we were not told" must stay
+                       distinguishable from "released to nobody", and the
+                       completeness gate counts them differently.
       platform_variant: the asset's variant, as stated by this observation.
-                       Unlike the labels above, this is RECORDED, not
-                       stamped-once: a later observation that states a
-                       non-empty variant overwrites what's stored, because
-                       the registry is reporting the latest thing it was
-                       told, not fixing a decision at first sight. An
-                       observation that carries no variant ("") never
-                       clears a variant the registry already has -- absence
-                       of new information is not new information.
+                       Like the labels above, this is RECORDED: a later
+                       observation that states a non-empty variant
+                       overwrites what's stored, because the registry is
+                       reporting the latest thing it was told, not fixing a
+                       decision at first sight. An observation that carries
+                       no variant ("") never clears a variant the registry
+                       already has -- absence of new information is not new
+                       information. (Unlike the labels, it is one column
+                       with no paired companion.)
 
     Behavior:
       - No row exists -> INSERT with the proposed assignment.
@@ -153,6 +160,19 @@ async def upsert_observation(
             'FROM asset_registry WHERE asset_id = $1',
             asset_id,
         )
+        # Label columns for the two UPDATE paths: a positive statement
+        # (non-empty originator_nation) relabels both columns, anything else
+        # leaves both alone (ADR-0029 s3, ADR-0050 s2; same rule as the CM
+        # service's asset_cm). Appended after each path's own params so
+        # their positions do not move.
+        label_set = ""
+        label_args: tuple = ()
+        if originator_nation:
+            label_set = ', originator_nation = ${n}, releasable_to = ${m}'
+            label_args = (
+                originator_nation,
+                list(releasable_to) if releasable_to is not None else [],
+            )
         if existing is None:
             # First observation: full insert.
             divergent = proposed_edge_id != observed_edge_id
@@ -205,11 +225,12 @@ async def upsert_observation(
                 '  edge_id = $2, region_id = $3, assignment_source = $4, '
                 '  assigned_by = $5, assigned_at = now(), '
                 '  last_observed_at = now(), observed_edge_id = $6, '
-                '  divergent = $7, platform_variant = $8 '
-                'WHERE asset_id = $1',
+                '  divergent = $7, platform_variant = $8'
+                + label_set.format(n=9, m=10) +
+                ' WHERE asset_id = $1',
                 asset_id, proposed_edge_id, proposed_region_id,
                 proposed_source, proposed_by, observed_edge_id, divergent,
-                kept_variant,
+                kept_variant, *label_args,
             )
             return RegistryRow(
                 asset_id=asset_id,
@@ -232,9 +253,10 @@ async def upsert_observation(
         await conn.execute(
             'UPDATE asset_registry SET '
             '  last_observed_at = now(), observed_edge_id = $2, divergent = $3, '
-            '  platform_variant = $4 '
-            'WHERE asset_id = $1',
-            asset_id, observed_edge_id, divergent, kept_variant,
+            '  platform_variant = $4'
+            + label_set.format(n=5, m=6) +
+            ' WHERE asset_id = $1',
+            asset_id, observed_edge_id, divergent, kept_variant, *label_args,
         )
         return RegistryRow(
             asset_id=asset_id,
