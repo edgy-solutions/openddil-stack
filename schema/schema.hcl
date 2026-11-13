@@ -2339,3 +2339,111 @@ table "asset_fielding" {
     columns = [column.fielded_to]
   }
 }
+
+# -----------------------------------------------------------------------------
+# failure_episodes -- closed manual-discrepancy episodes, projected at the tier
+# -----------------------------------------------------------------------------
+# ADR-0051 first slice, item 2. Carries the ADR-0029 labels and the producing
+# tier (edge_id). No usage-meter columns and no task columns in this increment.
+# -----------------------------------------------------------------------------
+table "failure_episodes" {
+  schema = schema.public
+
+  column "episode_id" {
+    type = text
+    null = false
+  }
+
+  column "detected_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "asset_id" {
+    type = text
+    null = false
+  }
+
+  column "component" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "fault_code" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "cleared_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "cleared_by" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "resolution" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "sources" {
+    type = jsonb
+    null = false
+    default = "[]"
+  }
+
+  column "baseline_id" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "mod_compliance" {
+    type = jsonb
+    null = false
+    default = "[]"
+  }
+
+  column "originator_nation" {
+    type = text
+    null = false
+  }
+
+  column "releasable_to" {
+    type = sql("text[]")
+    null = false
+    default = sql("'{}'")
+  }
+
+  column "edge_id" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "region_id" {
+    type = text
+    null = true
+  }
+
+  column "updated_at" {
+    type = timestamptz
+    null = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.episode_id, column.detected_at]
+  }
+
+  index "idx_failure_episodes_asset_id" {
+    columns = [column.asset_id]
+  }
+}
