@@ -11,8 +11,8 @@ MIGRATION = (MIG_DIR / "20261113000000_failure_episodes.sql").read_text(encoding
 COLUMNS = (
     "episode_id", "detected_at", "asset_id", "component", "fault_code",
     "cleared_at", "cleared_by", "resolution", "sources", "baseline_id",
-    "mod_compliance", "originator_nation", "releasable_to", "edge_id",
-    "region_id", "body_sha256", "updated_at",
+    "mod_compliance", "originator_nation", "releasable_to", "label_key", "label",
+    "edge_id", "region_id", "body_sha256", "updated_at",
 )
 WITHHELD = (
     "body_sha256", "stage", "reason", "asset_id", "episode_id", "detected_at",
@@ -40,6 +40,26 @@ def test_table_declared_and_migrated():
         assert f'"{c}" ' in MIGRATION, c
         assert f'column "{c}"' in block, c
     assert block.count("  column ") == len(COLUMNS)
+
+
+def test_releasable_to_has_no_default():
+    sql = re.search(r'"releasable_to" text\[\][^\n]*', MIGRATION).group(0)
+    assert "DEFAULT" not in sql and "NOT NULL" in sql
+    m = re.search(r'column "releasable_to" \{.*?\n  \}', _hcl_block(), re.S).group(0)
+    assert "default" not in m
+
+
+def test_label_and_nation_columns_have_no_default():
+    ddl = MIGRATION[MIGRATION.index('CREATE TABLE "public"."failure_episodes" ('):]
+    ddl = ddl[: ddl.index("\n);")]
+    for c in ("originator_nation", "releasable_to", "label_key", "label"):
+        line = re.search(rf'^  "{c}" [^\n]*', ddl, re.M).group(0)
+        assert "DEFAULT" not in line, c
+        blk = re.search(rf'column "{c}" \{{.*?\n  \}}', _hcl_block(), re.S).group(0)
+        assert "default" not in blk, c
+    assert "failure_episodes_label_key_form" in MIGRATION
+    assert "failure_episodes_label_pair" in MIGRATION
+    assert '"idx_failure_episodes_label_key"' in MIGRATION
 
 
 def test_withheld_table_declared_and_migrated():

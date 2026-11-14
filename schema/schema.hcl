@@ -2416,10 +2416,23 @@ table "failure_episodes" {
     null = false
   }
 
+  # Required, no default; {} only when the record says released to no other
+  # nation (ADR-0029 section 7, ADR-0055 section 1a).
   column "releasable_to" {
     type = sql("text[]")
     null = false
-    default = sql("'{}'")
+  }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.2), compiled at write by
+  # the projector with openddil_labels. Both NULL when there is no key.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
   }
 
   column "edge_id" {
@@ -2452,6 +2465,18 @@ table "failure_episodes" {
 
   index "idx_failure_episodes_asset_id" {
     columns = [column.asset_id]
+  }
+
+  index "idx_failure_episodes_label_key" {
+    columns = [column.label_key]
+  }
+
+  check "failure_episodes_label_key_form" {
+    expr = "label_key IS NULL OR label_key ~ '^lk1:[0-9a-f]{64}$'"
+  }
+
+  check "failure_episodes_label_pair" {
+    expr = "(label_key IS NULL) = (label IS NULL)"
   }
 }
 

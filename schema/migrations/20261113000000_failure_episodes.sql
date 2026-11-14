@@ -18,17 +18,28 @@ CREATE TABLE "public"."failure_episodes" (
   "baseline_id" text NOT NULL DEFAULT '',
   "mod_compliance" jsonb NOT NULL DEFAULT '[]',
   "originator_nation" text NOT NULL,
-  "releasable_to" text[] NOT NULL DEFAULT '{}',
+  -- Required, no default; {} is written only when the record says released to
+  -- no other nation (ADR-0029 section 7, ADR-0055 section 1a).
+  "releasable_to" text[] NOT NULL,
+  -- lk1 label key and body per DESIGN-2026-11-06 section 1.2, compiled at write
+  -- by the projector with openddil_labels. Both NULL when there is no key, which
+  -- means no label_policy row; an unlabelled close is refused before it gets here.
+  "label_key" text NULL,
+  "label" jsonb NULL,
   "edge_id" text NOT NULL DEFAULT '',
   "region_id" text NULL,
   -- sha256 hex of the canonical JSON of the record as first written; a replay
   -- is compared against it and never overwrites.
   "body_sha256" text NOT NULL,
   "updated_at" timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY ("episode_id", "detected_at")
+  PRIMARY KEY ("episode_id", "detected_at"),
+  CONSTRAINT "failure_episodes_label_key_form" CHECK ("label_key" IS NULL OR "label_key" ~ '^lk1:[0-9a-f]{64}$'),
+  CONSTRAINT "failure_episodes_label_pair" CHECK (("label_key" IS NULL) = ("label" IS NULL))
 );
 -- Create index "idx_failure_episodes_asset_id" to table: "failure_episodes"
 CREATE INDEX "idx_failure_episodes_asset_id" ON "public"."failure_episodes" ("asset_id");
+-- Create index "idx_failure_episodes_label_key" to table: "failure_episodes"
+CREATE INDEX "idx_failure_episodes_label_key" ON "public"."failure_episodes" ("label_key");
 -- failure_episodes_withheld: failure-episode records refused at emit, backfill
 -- or projection, kept with their reason (ADR-0055: withheld, not dropped).
 -- Never pruned. Operator-only: not published to Electric and not in any PEP
