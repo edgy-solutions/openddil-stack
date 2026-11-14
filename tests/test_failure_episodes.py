@@ -12,24 +12,46 @@ COLUMNS = (
     "episode_id", "detected_at", "asset_id", "component", "fault_code",
     "cleared_at", "cleared_by", "resolution", "sources", "baseline_id",
     "mod_compliance", "originator_nation", "releasable_to", "edge_id",
-    "region_id", "updated_at",
+    "region_id", "body_sha256", "updated_at",
+)
+WITHHELD = (
+    "body_sha256", "stage", "reason", "asset_id", "episode_id", "detected_at",
+    "body", "edge_id", "region_id", "first_seen_at", "last_seen_at", "times_seen",
 )
 FLOOR = "20261031000000"
 
 
 def _hcl_block():
-    start = HCL.index('table "failure_episodes"')
+    start = HCL.index('table "failure_episodes" ')
+    nxt = HCL.find('\ntable "', start + 1)
+    return HCL[start:] if nxt == -1 else HCL[start:nxt]
+
+
+def _withheld_block():
+    start = HCL.index('table "failure_episodes_withheld"')
     nxt = HCL.find('\ntable "', start + 1)
     return HCL[start:] if nxt == -1 else HCL[start:nxt]
 
 
 def test_table_declared_and_migrated():
-    assert 'CREATE TABLE "public"."failure_episodes"' in MIGRATION
+    assert 'CREATE TABLE "public"."failure_episodes" (' in MIGRATION
     block = _hcl_block()
     for c in COLUMNS:
         assert f'"{c}" ' in MIGRATION, c
         assert f'column "{c}"' in block, c
     assert block.count("  column ") == len(COLUMNS)
+
+
+def test_withheld_table_declared_and_migrated():
+    assert 'CREATE TABLE "public"."failure_episodes_withheld" (' in MIGRATION
+    block = _withheld_block()
+    for c in WITHHELD:
+        assert f'"{c}" ' in MIGRATION, c
+        assert f'column "{c}"' in block, c
+    assert block.count("  column ") == len(WITHHELD)
+    assert 'PRIMARY KEY ("body_sha256", "stage", "reason")' in MIGRATION
+    assert "columns = [column.body_sha256, column.stage, column.reason]" in block
+    assert '"idx_failure_episodes_withheld_asset_id"' in MIGRATION
 
 
 def test_primary_key():
@@ -48,7 +70,7 @@ def slice_violations(sql_texts):
     out = []
     for text in sql_texts:
         for m in re.finditer(r'CREATE\s+TABLE\s+"public"\."(\w+)"', text, re.I):
-            if m.group(1) != "failure_episodes":
+            if m.group(1) not in ("failure_episodes", "failure_episodes_withheld"):
                 out.append(f"CREATE TABLE {m.group(1)}")
         if re.search(r'ALTER\s+TABLE\s+"public"\."egress_delivered_events"', text, re.I):
             out.append("ALTER TABLE egress_delivered_events")
@@ -78,3 +100,8 @@ def test_red_ledger_alter_and_new_table_reported():
     assert "column task_status" in v
     create = 'CREATE TABLE "public"."episode_tasks" ("id" text NOT NULL);'
     assert "CREATE TABLE episode_tasks" in slice_violations(_real_texts() + [create])
+
+
+def test_red_task_id_on_withheld_reported():
+    planted = 'ALTER TABLE "public"."failure_episodes_withheld" ADD COLUMN "task_id" text NULL;'
+    assert "column task_id" in slice_violations(_real_texts() + [planted])

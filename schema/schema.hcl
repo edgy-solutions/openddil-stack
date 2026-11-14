@@ -2433,6 +2433,13 @@ table "failure_episodes" {
     null = true
   }
 
+  # sha256 hex of the canonical JSON of the record as first written; a replay
+  # is compared against it and never overwrites.
+  column "body_sha256" {
+    type = text
+    null = false
+  }
+
   column "updated_at" {
     type = timestamptz
     null = false
@@ -2444,6 +2451,90 @@ table "failure_episodes" {
   }
 
   index "idx_failure_episodes_asset_id" {
+    columns = [column.asset_id]
+  }
+}
+
+# -----------------------------------------------------------------------------
+# failure_episodes_withheld -- failure-episode records refused at emit,
+# backfill or projection, kept with their reason (ADR-0055: withheld, not
+# dropped). Never pruned. Operator-only: not published to Electric and not in
+# any PEP read set. edge_id / region_id name the producing tier.
+# -----------------------------------------------------------------------------
+table "failure_episodes_withheld" {
+  schema = schema.public
+
+  column "body_sha256" {
+    type = text
+    null = false
+  }
+
+  column "stage" {
+    type = text
+    null = false
+  }
+
+  column "reason" {
+    type = text
+    null = false
+  }
+
+  column "asset_id" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "episode_id" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "detected_at" {
+    type = timestamptz
+    null = true
+  }
+
+  column "body" {
+    type = jsonb
+    null = false
+  }
+
+  column "edge_id" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "region_id" {
+    type = text
+    null = true
+  }
+
+  column "first_seen_at" {
+    type = timestamptz
+    null = false
+    default = sql("now()")
+  }
+
+  column "last_seen_at" {
+    type = timestamptz
+    null = false
+    default = sql("now()")
+  }
+
+  column "times_seen" {
+    type = bigint
+    null = false
+    default = 1
+  }
+
+  primary_key {
+    columns = [column.body_sha256, column.stage, column.reason]
+  }
+
+  index "idx_failure_episodes_withheld_asset_id" {
     columns = [column.asset_id]
   }
 }
