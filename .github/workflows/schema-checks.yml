@@ -1,38 +1,63 @@
 name: Schema checks
 
 # Catches schema migration regressions at PR time rather than at deploy
-# time. Two layers of validation:
+# time. Three layers of validation:
 #
-#   1. Structural checks (pytest) — runs on any host with python +
-#      pytest. Verifies filename convention, atlas.sum integrity,
-#      chronological ordering, non-empty content. Caught the missing
-#      Phase 5 atlas.sum entry on its first run (the commit message
-#      flagged "run atlas migrate hash" as a TODO; the test made it
-#      a blocker).
+#   1. Tests (pytest) — every test under tests/. Structural checks
+#      (filename convention, atlas.sum integrity, chronological ordering,
+#      non-empty content) need nothing. The SQL tests (for example the lk1
+#      label key functions) run against the Postgres 15 service below,
+#      reached through OPENDDIL_TEST_PG_DSN. In CI a skipped test fails the
+#      job: a SQL test that skips here is a silent pass.
 #
-#   2. Atlas semantic validation — runs via the official atlas docker
-#      image. `atlas migrate validate` checks SQL syntax + cross-file
-#      consistency (e.g. dropping a column added in a later migration).
-#      `atlas migrate lint` runs additional safety checks (e.g.
-#      non-additive changes on tables in active use).
+#   2. Atlas semantic validation — `atlas migrate validate` replays every
+#      migration on a Postgres 15 dev database and checks SQL syntax and
+#      cross-file consistency (e.g. dropping a column added in a later
+#      migration).
 #
-# Both layers run on push and PR to master touching schema/.
+#   3. Atlas lint — `atlas migrate lint` flags non-additive changes and
+#      other deploy-risk patterns on the latest migration. Advisory.
+#
+# The default branch is main. Until 2026-11-15 this file triggered on
+# master, so it never ran.
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
     paths:
       - "schema/**"
+      - "tests/**"
       - ".github/workflows/schema-checks.yml"
   pull_request:
-    branches: [ "master" ]
+    branches: [ "main" ]
     paths:
       - "schema/**"
+      - "tests/**"
       - ".github/workflows/schema-checks.yml"
+  workflow_dispatch:
 
 jobs:
-  structural-tests:
+  tests:
     runs-on: ubuntu-latest
+    # A throwaway database for this job only. The credentials are not a
+    # secret: the service exists for the length of the job and is reachable
+    # only from the runner.
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      OPENDDIL_TEST_PG_DSN: postgresql://ci:ci@localhost:5432/ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -40,23 +65,50 @@ jobs:
           python-version: "3.11"
       - name: Install pytest
         run: pip install pytest
-      - name: Run structural migration tests
-        run: pytest tests/test_migrations.py -v
+      - name: psql client and server version
+        run: |
+          command -v psql || { sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client; }
+          psql --version
+          psql "$OPENDDIL_TEST_PG_DSN" -X -At -c "select current_setting('server_version')"
+      - name: Run tests (no skips allowed)
+        run: pytest tests/ -v -rs --junitxml=pytest-results.xml
+      - name: Fail on skipped tests
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse("pytest-results.xml").getroot()
+          suites = [root] if root.tag == "testsuite" else list(root.iter("testsuite"))
+          skipped = sum(int(s.get("skipped", 0)) for s in suites)
+          print(f"skipped={skipped}")
+          raise SystemExit(1 if skipped else 0)
+          PY
 
   atlas-validate:
     runs-on: ubuntu-latest
-    # Atlas's own validation: checks that migrations parse + the
-    # cumulative schema is coherent. Uses the arigaio/atlas docker
-    # image so we don't need to install atlas on the runner.
-    container:
-      image: arigaio/atlas:latest
+    # Atlas replays the migrations on its own dev database, so this job has
+    # its own Postgres 15 service rather than sharing the tests' database.
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
+      - uses: ariga/setup-atlas@v0
       - name: atlas migrate validate
         run: |
           atlas migrate validate \
             --dir file://schema/migrations \
-            --dev-url "sqlite://dev?mode=memory"
+            --dev-url "postgres://ci:ci@localhost:5432/ci?sslmode=disable"
 
   atlas-lint:
     runs-on: ubuntu-latest
@@ -65,13 +117,26 @@ jobs:
     # output is preserved in the action logs so authors see what
     # they introduced.
     continue-on-error: true
-    container:
-      image: arigaio/atlas:latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
+      - uses: ariga/setup-atlas@v0
       - name: atlas migrate lint (latest)
         run: |
           atlas migrate lint \
             --dir file://schema/migrations \
-            --dev-url "sqlite://dev?mode=memory" \
+            --dev-url "postgres://ci:ci@localhost:5432/ci?sslmode=disable" \
             --latest 1
