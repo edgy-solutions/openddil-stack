@@ -17,8 +17,9 @@ What runs where:
     DISTINCT inside string_agg).
   * The postgres tests run only when OPENDDIL_TEST_PG_DSN is set and psql is
     on PATH; otherwise they skip, and the skip reason names which is missing.
-    They run the migration and the vector queries inside BEGIN ... ROLLBACK,
-    so nothing is left in the database.
+    They run the migration (without its own BEGIN;/COMMIT; lines) and the
+    vector queries inside BEGIN ... ROLLBACK, so nothing is left in the
+    database.
 
 The release set is sorted in the migration with a subquery, not string_agg
 DISTINCT. DESIGN-2026-11-06 section 1.2 wrote string_agg(DISTINCT x, ','
@@ -61,6 +62,20 @@ def _migration_text() -> str:
     return MIGRATION.read_text(encoding="utf-8")
 
 
+def _migration_body() -> str:
+    """The migration without its own BEGIN; and COMMIT; lines.
+
+    The file carries its own transaction (Atlas applies with --tx-mode none).
+    The postgres tests wrap it in BEGIN ... ROLLBACK so nothing is left
+    behind; the file's COMMIT would end that transaction early, so the
+    tests run it without those two lines. Its SET LOCAL lines stay and hold
+    for the test's transaction.
+    """
+    lines = _migration_text().split("\n")
+    assert lines.count("BEGIN;") == 1 and lines.count("COMMIT;") == 1
+    return "\n".join(x for x in lines if x not in ("BEGIN;", "COMMIT;"))
+
+
 # ---------------------------------------------------------------------------
 # Postgres-free tests
 # ---------------------------------------------------------------------------
@@ -96,6 +111,23 @@ def test_public_functions_are_immutable():
 
 def test_version_guard_present():
     assert "110000" in _migration_text()
+
+
+def test_own_transaction_with_local_timeouts():
+    # Atlas applies with --tx-mode none, so the file is its own transaction:
+    # BEGIN, then both timeouts as SET LOCAL, before any other statement;
+    # COMMIT as the last statement. squawk: require-lock-timeout,
+    # require-statement-timeout.
+    statements = [
+        x for x in _migration_text().split("\n")
+        if x.strip() and not x.startswith("--")
+    ]
+    assert statements[0] == "BEGIN;"
+    assert re.fullmatch(r"SET LOCAL lock_timeout = '\d+m?s';", statements[1])
+    assert re.fullmatch(r"SET LOCAL statement_timeout = '\d+m?s';", statements[2])
+    assert statements[-1] == "COMMIT;"
+    assert _migration_text().split("\n").count("BEGIN;") == 1
+    assert _migration_text().split("\n").count("COMMIT;") == 1
 
 
 def test_no_distinct_inside_string_agg():
@@ -161,7 +193,7 @@ def _marked(expr: str) -> str:
 
 @requires_pg
 def test_sql_matches_vectors_and_properties():
-    lines = ["\\set ON_ERROR_STOP 1", "BEGIN;", _migration_text().rstrip("\n"), ""]
+    lines = ["\\set ON_ERROR_STOP 1", "BEGIN;", _migration_body().rstrip("\n"), ""]
     vectors = _vectors()
     for v in vectors:
         a = _args(v)
@@ -213,7 +245,7 @@ def test_sql_invalid_policy_id_raises():
         [
             "\\set ON_ERROR_STOP 1",
             "BEGIN;",
-            _migration_text().rstrip("\n"),
+            _migration_body().rstrip("\n"),
             "SELECT \"public\".\"lk1_canonical\"('Bad Policy', 'ATL', NULL);",
             "ROLLBACK;",
             "",
@@ -236,7 +268,7 @@ def _tail(canonical: str) -> str:
 
 @requires_pg
 def test_sql_string_agg_corrected_form_matches_function_and_vectors():
-    lines = ["\\set ON_ERROR_STOP 1", "BEGIN;", _migration_text().rstrip("\n"), ""]
+    lines = ["\\set ON_ERROR_STOP 1", "BEGIN;", _migration_body().rstrip("\n"), ""]
     fed = [
         v for v in _vectors()
         if v["releasable_to"] is not None and v["canonical"] is not None

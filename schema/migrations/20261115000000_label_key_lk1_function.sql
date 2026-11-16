@@ -27,6 +27,18 @@
 -- because both are tested against one vector table
 -- (tests/vectors/lk1.json), not because one was ported from the other.
 -- See tests/test_label_key_lk1_sql.py.
+--
+-- TRANSACTION AND TIMEOUTS
+-- Atlas applies with --tx-mode none, so this file carries its own
+-- BEGIN/COMMIT: the four functions land together or not at all. SET LOCAL
+-- holds the timeouts to this transaction only. Nothing here touches a table;
+-- the only locks are catalog rows for the four functions, so 5 s waiting on a
+-- lock and 30 s per statement are far above what it needs (squawk:
+-- require-lock-timeout, require-statement-timeout).
+
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '30s';
 
 DO $guard$
 BEGIN
@@ -140,3 +152,5 @@ COMMENT ON FUNCTION "public"."lk1_key"(text, text, text[])
   IS 'lk1 label key: lk1: plus sha256 hex of the canonical form; DESIGN-2026-11-06 section 1.2.';
 COMMENT ON FUNCTION "public"."lk1_label"(text, text, text[])
   IS 'lk1 label body as jsonb, NULL when there is no key; DESIGN-2026-11-06 section 1.2.';
+
+COMMIT;
