@@ -20,6 +20,13 @@ What runs where:
     They run the migration and the vector queries inside BEGIN ... ROLLBACK,
     so nothing is left in the database.
 
+The release set is sorted in the migration with a subquery, not string_agg
+DISTINCT. DESIGN-2026-11-06 section 1.2 wrote string_agg(DISTINCT x, ','
+ORDER BY x COLLATE "C"), which postgres likely refuses (with DISTINCT, ORDER BY
+expressions must appear in the argument list); the proposed correction puts the
+collation on the argument too. The string_agg tests below confirm both forms
+against a real postgres so the design text can be corrected to what CI shows.
+
 Standard library plus pytest only.
 """
 from __future__ import annotations
@@ -215,3 +222,74 @@ def test_sql_invalid_policy_id_raises():
     proc = _run_psql(script)
     assert proc.returncode != 0
     assert "lk1: invalid policy_id" in proc.stderr
+
+
+_AGG_CORRECTED = (
+    "coalesce((SELECT string_agg(DISTINCT x COLLATE \"C\", ',' ORDER BY x COLLATE \"C\") "
+    "FROM unnest(%s) AS t(x)), '')"
+)
+
+
+def _tail(canonical: str) -> str:
+    return canonical.split("|", 4)[4]
+
+
+@requires_pg
+def test_sql_string_agg_corrected_form_matches_function_and_vectors():
+    lines = ["\\set ON_ERROR_STOP 1", "BEGIN;", _migration_text().rstrip("\n"), ""]
+    fed = [
+        v for v in _vectors()
+        if v["releasable_to"] is not None and v["canonical"] is not None
+    ]
+    for v in fed:
+        arr = _arr(v["releasable_to"])
+        lines.append(
+            "SELECT %s, %s, %s;"
+            % (
+                _lit(v["name"]),
+                _AGG_CORRECTED % arr,
+                "array_to_string(\"public\".\"lk1_sorted_release\"(%s), ',')" % arr,
+            )
+        )
+    # Byte order and de-duplication, no migration needed.
+    lines.append("SELECT 'byte_order', %s, '';" % (_AGG_CORRECTED % "ARRAY['b','B','a','B']::text[]"))
+    lines.append("ROLLBACK;")
+    proc = _run_psql("\n".join(lines) + "\n")
+    assert proc.returncode == 0, proc.stderr
+
+    rows = {}
+    for line in proc.stdout.splitlines():
+        if not line:
+            continue
+        parts = line.split("\t")
+        rows[parts[0]] = parts[1:]
+
+    assert any(v["releasable_to"] == [] for v in fed)
+    assert any(
+        v["releasable_to"] and v["releasable_to"] != sorted(set(v["releasable_to"]))
+        for v in fed
+    )
+    for v in fed:
+        got = rows[v["name"]]
+        assert len(got) == 2, v["name"]
+        want = _tail(v["canonical"])
+        assert got[0] == want, v["name"]
+        assert got[1] == want, v["name"]
+
+    # Under "C", uppercase sorts before lowercase; a locale collation would not.
+    assert rows["byte_order"][0] == "B,a,b"
+
+
+@requires_pg
+def test_sql_string_agg_design_original_form_is_refused():
+    # ON_ERROR_STOP: without it psql exits 0 after a failed statement in an -f script.
+    proc = _run_psql(
+        "\\set ON_ERROR_STOP 1\n"
+        "SELECT string_agg(DISTINCT x, ',' ORDER BY x COLLATE \"C\") "
+        "FROM unnest(ARRAY['b','a']::text[]) AS t(x);\n"
+    )
+    detail = "exit=%s stdout=%r stderr=%r" % (
+        proc.returncode, proc.stdout[:500], proc.stderr[:500],
+    )
+    assert proc.returncode != 0, detail
+    assert "ORDER BY expressions must appear in argument list" in proc.stderr, detail
