@@ -6,17 +6,24 @@ name: Schema checks
 #   1. Tests (pytest) — every test under tests/. Structural checks
 #      (filename convention, atlas.sum integrity, chronological ordering,
 #      non-empty content) need nothing. The SQL tests (for example the lk1
-#      label key functions) run against the Postgres 15 service below,
-#      reached through OPENDDIL_TEST_PG_DSN. In CI a skipped test fails the
-#      job: a SQL test that skips here is a silent pass.
+#      label key functions) run against the Postgres service below, reached
+#      through OPENDDIL_TEST_PG_DSN. In CI a skipped test fails the job: a
+#      SQL test that skips here is a silent pass.
 #
 #   2. Atlas semantic validation — `atlas migrate validate` replays every
-#      migration on a Postgres 15 dev database and checks SQL syntax and
+#      migration on a Postgres dev database and checks SQL syntax and
 #      cross-file consistency (e.g. dropping a column added in a later
 #      migration).
 #
 #   3. Atlas lint — `atlas migrate lint` flags non-additive changes and
 #      other deploy-risk patterns on the latest migration. Advisory.
+#
+# Postgres versions (the matrix on every job):
+#   17  the deployment target. Must pass.
+#   15  what the test labs run today (read from the running servers on
+#       2026-11-16: 15.18 and 15.19), so a lab roll is covered too. When the
+#       labs move to 17, drop 15 and the matrix is 17 alone.
+# docker-compose.yml's postgres:16-alpine is neither, and is not checked.
 #
 # The default branch is main. Until 2026-11-15 this file triggered on
 # master, so it never ran.
@@ -38,13 +45,18 @@ on:
 
 jobs:
   tests:
+    name: tests (postgres ${{ matrix.postgres }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [ "17", "15" ]
     # A throwaway database for this job only. The credentials are not a
     # secret: the service exists for the length of the job and is reachable
     # only from the runner.
     services:
       postgres:
-        image: postgres:15
+        image: postgres:${{ matrix.postgres }}
         env:
           POSTGRES_USER: ci
           POSTGRES_PASSWORD: ci
@@ -69,7 +81,9 @@ jobs:
         run: |
           command -v psql || { sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client; }
           psql --version
-          psql "$OPENDDIL_TEST_PG_DSN" -X -At -c "select current_setting('server_version')"
+          v=$(psql "$OPENDDIL_TEST_PG_DSN" -X -At -c "select current_setting('server_version_num')::int / 10000")
+          echo "server major $v, matrix ${{ matrix.postgres }}"
+          [ "$v" = "${{ matrix.postgres }}" ]
       - name: Run tests (no skips allowed)
         run: pytest tests/ -v -rs --junitxml=pytest-results.xml
       - name: Fail on skipped tests
@@ -84,12 +98,17 @@ jobs:
           PY
 
   atlas-validate:
+    name: atlas validate (postgres ${{ matrix.postgres }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [ "17", "15" ]
     # Atlas replays the migrations on its own dev database, so this job has
-    # its own Postgres 15 service rather than sharing the tests' database.
+    # its own Postgres service rather than sharing the tests' database.
     services:
       postgres:
-        image: postgres:15
+        image: postgres:${{ matrix.postgres }}
         env:
           POSTGRES_USER: ci
           POSTGRES_PASSWORD: ci
@@ -111,7 +130,12 @@ jobs:
             --dev-url "postgres://ci:ci@localhost:5432/ci?sslmode=disable"
 
   atlas-lint:
+    name: atlas lint (postgres ${{ matrix.postgres }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [ "17", "15" ]
     # Lint surfaces non-additive changes and other deploy-risk patterns
     # — failures here are advisory (continue-on-error), but the
     # output is preserved in the action logs so authors see what
@@ -119,7 +143,7 @@ jobs:
     continue-on-error: true
     services:
       postgres:
-        image: postgres:15
+        image: postgres:${{ matrix.postgres }}
         env:
           POSTGRES_USER: ci
           POSTGRES_PASSWORD: ci
