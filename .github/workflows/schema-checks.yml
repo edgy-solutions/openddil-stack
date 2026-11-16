@@ -77,13 +77,30 @@ jobs:
           python-version: "3.11"
       - name: Install pytest
         run: pip install pytest
-      - name: psql client and server version
+      # The SQL tests call `psql` from PATH and skip without it, and a skip
+      # fails this job. Install the client of the matrix version from the
+      # PostgreSQL apt repository and put it first on PATH for later steps,
+      # so the client and the server are the same major version.
+      - name: psql client of the matrix version
+        env:
+          PG_MAJOR: ${{ matrix.postgres }}
         run: |
-          command -v psql || { sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client; }
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends "postgresql-client-$PG_MAJOR"
+          echo "/usr/lib/postgresql/$PG_MAJOR/bin" >> "$GITHUB_PATH"
+      - name: Client and server versions match the matrix
+        env:
+          PG_MAJOR: ${{ matrix.postgres }}
+        run: |
+          command -v psql
           psql --version
-          v=$(psql "$OPENDDIL_TEST_PG_DSN" -X -At -c "select current_setting('server_version_num')::int / 10000")
-          echo "server major $v, matrix ${{ matrix.postgres }}"
-          [ "$v" = "${{ matrix.postgres }}" ]
+          c=$(psql --version | awk '{print $3}' | cut -d. -f1)
+          s=$(psql "$OPENDDIL_TEST_PG_DSN" -X -At -c "select current_setting('server_version_num')::int / 10000")
+          echo "client major $c, server major $s, matrix $PG_MAJOR"
+          [ "$c" = "$PG_MAJOR" ] && [ "$s" = "$PG_MAJOR" ]
+          [ -n "$OPENDDIL_TEST_PG_DSN" ]
       - name: Run tests (no skips allowed)
         run: pytest tests/ -v -rs --junitxml=pytest-results.xml
       - name: Fail on skipped tests
