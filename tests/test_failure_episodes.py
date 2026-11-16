@@ -79,6 +79,22 @@ def test_primary_key():
     assert "columns = [column.episode_id, column.detected_at]" in _hcl_block()
 
 
+def test_own_transaction_with_local_timeouts():
+    # Atlas applies with --tx-mode none, so the file is its own transaction:
+    # BEGIN, then both timeouts as SET LOCAL, before any other statement;
+    # COMMIT as the last statement. squawk: require-lock-timeout,
+    # require-statement-timeout. A test that runs this file inside its own
+    # BEGIN ... ROLLBACK must drop the BEGIN;/COMMIT; lines first.
+    lines = MIGRATION.split("\n")
+    statements = [x for x in lines if x.strip() and not x.startswith("--")]
+    assert statements[0] == "BEGIN;"
+    assert re.fullmatch(r"SET LOCAL lock_timeout = '\d+m?s';", statements[1])
+    assert re.fullmatch(r"SET LOCAL statement_timeout = '\d+m?s';", statements[2])
+    assert statements[-1] == "COMMIT;"
+    assert lines.count("BEGIN;") == 1
+    assert lines.count("COMMIT;") == 1
+
+
 def test_no_usage_meter_or_task_columns():
     for c in COLUMNS:
         assert not re.search(r"rounds|moves|task", c)
