@@ -5,6 +5,14 @@
 -- edge_id names the producing tier. Usage-meter columns (rounds / moves at
 -- open and close) are ADR-0051's and are out of this increment. No task id or
 -- task status is carried here.
+--
+-- Atlas applies migrations with --tx-mode none, so this file carries its own
+-- transaction. The lock and statement timeouts are SET LOCAL and end at COMMIT.
+
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '60s';
+
 CREATE TABLE "public"."failure_episodes" (
   "episode_id" text NOT NULL,
   "detected_at" timestamptz NOT NULL,
@@ -61,3 +69,5 @@ CREATE TABLE "public"."failure_episodes_withheld" (
 );
 -- Create index "idx_failure_episodes_withheld_asset_id" to table: "failure_episodes_withheld"
 CREATE INDEX "idx_failure_episodes_withheld_asset_id" ON "public"."failure_episodes_withheld" ("asset_id");
+
+COMMIT;
