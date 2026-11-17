@@ -1,0 +1,1414 @@
+{
+  "declarations": {
+    "legacy_nation_only": {
+      "dimensions": [
+        {
+          "has_author": true,
+          "name": "nation",
+          "owner": "nation-steward",
+          "type": "permissive",
+          "vocabulary": [
+            "ATL",
+            "BDR",
+            "CRD"
+          ]
+        }
+      ],
+      "policy_id": "example:policy-1"
+    },
+    "nation_only": {
+      "dimensions": [
+        {
+          "has_author": true,
+          "name": "nation",
+          "owner": "nation-steward",
+          "type": "permissive",
+          "vocabulary": [
+            "ATL",
+            "BDR",
+            "CRD"
+          ]
+        }
+      ],
+      "policy_id": "urn:oid:1.3.6.1.4.1.32473.1"
+    },
+    "nation_rights": {
+      "dimensions": [
+        {
+          "has_author": true,
+          "name": "nation",
+          "owner": "nation-steward",
+          "type": "permissive",
+          "vocabulary": [
+            "ATL",
+            "BDR",
+            "CRD"
+          ]
+        },
+        {
+          "has_author": false,
+          "name": "data_rights_holder",
+          "owner": "rights-steward",
+          "type": "restrictive",
+          "vocabulary": [
+            "H1",
+            "H2"
+          ]
+        }
+      ],
+      "policy_id": "urn:oid:1.3.6.1.4.1.32473.2"
+    },
+    "nation_rights_level": {
+      "dimensions": [
+        {
+          "has_author": true,
+          "name": "nation",
+          "owner": "nation-steward",
+          "type": "permissive",
+          "vocabulary": [
+            "ATL",
+            "BDR",
+            "CRD"
+          ]
+        },
+        {
+          "has_author": false,
+          "name": "data_rights_holder",
+          "owner": "rights-steward",
+          "type": "restrictive",
+          "vocabulary": [
+            "H1",
+            "H2"
+          ]
+        },
+        {
+          "has_author": false,
+          "name": "classification",
+          "owner": "level-steward",
+          "type": "hierarchical",
+          "vocabulary": [
+            "L1",
+            "L2",
+            "L3"
+          ]
+        }
+      ],
+      "policy_id": "urn:oid:1.3.6.1.4.1.32473.3"
+    }
+  },
+  "form": "lk2|<policy_id>|nation|<authors>|<release>[|<name>|<values>]... ; nation first, then the other dimensions by name in byte order; <authors> is the sorted distinct authors joined by ',' or the literal @rollup; <release> is ~ when absent, empty when declared empty, else sorted distinct joined by ','; a set dimension is sorted distinct joined by ',' (empty when declared empty); a hierarchical dimension is its one level; key = 'lk2:' + sha256(canonical as UTF-8) in lower-case hex; life is in the body only, never in the canonical string or the key.",
+  "policy_ids": [
+    {
+      "accepted": true,
+      "policy_id": "urn:oid:1.3.6.1.4.1.32473.1"
+    },
+    {
+      "accepted": true,
+      "policy_id": "urn:oid:1.3.26.1.3.1"
+    },
+    {
+      "accepted": false,
+      "policy_id": "urn:isbn:0451450523"
+    },
+    {
+      "accepted": false,
+      "policy_id": "example:policy-1"
+    },
+    {
+      "accepted": false,
+      "policy_id": "URN:OID:1.2"
+    },
+    {
+      "accepted": false,
+      "policy_id": "urn:oid:1.03"
+    },
+    {
+      "accepted": false,
+      "policy_id": "urn:oid:3.1"
+    },
+    {
+      "accepted": false,
+      "policy_id": "urn:oid:1"
+    },
+    {
+      "accepted": false,
+      "policy_id": "urn:oid:1.111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "accepted": false,
+      "policy_id": null
+    },
+    {
+      "accepted": false,
+      "policy_id": 1
+    }
+  ],
+  "vectors": [
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.1|nation|ATL,BDR|CRD",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "BDR",
+            "ATL"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "nation": {
+            "author": [
+              "ATL",
+              "BDR"
+            ],
+            "release": [
+              "CRD"
+            ]
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 2
+      },
+      "label_key": "lk2:b4d795eb7f2c949dfbae53b23bd0cc519783dd0cb4c1723b7df9a6167e7c1ada",
+      "life": null,
+      "name": "composite_release",
+      "no_key": null,
+      "no_key_dimension": null
+    },
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.1|nation|ATL,BDR|",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "ATL",
+            "BDR"
+          ],
+          "release": []
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "nation": {
+            "author": [
+              "ATL",
+              "BDR"
+            ],
+            "release": []
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 2
+      },
+      "label_key": "lk2:df136542247359c812916b9cd739b5119fe01217ac3b1d04df10b21ed4a2b2ef",
+      "life": null,
+      "name": "composite_release_empty",
+      "no_key": null,
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "ATL",
+            "BDR"
+          ],
+          "release": null
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "composite_release_absent",
+      "no_key": "release_absent",
+      "no_key_dimension": "nation"
+    },
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.1|nation|ATL,BDR|CRD",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "ATL",
+            "BDR",
+            "ATL"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "nation": {
+            "author": [
+              "ATL",
+              "BDR"
+            ],
+            "release": [
+              "CRD"
+            ]
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 2
+      },
+      "label_key": "lk2:b4d795eb7f2c949dfbae53b23bd0cc519783dd0cb4c1723b7df9a6167e7c1ada",
+      "life": null,
+      "name": "composite_duplicate_authors",
+      "no_key": null,
+      "no_key_dimension": null,
+      "same_key_as": "composite_release"
+    },
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.1|nation|@rollup|ATL,BDR",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "release": [
+            "BDR",
+            "ATL"
+          ],
+          "rollup": true
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "nation": {
+            "release": [
+              "ATL",
+              "BDR"
+            ],
+            "rollup": true
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 2
+      },
+      "label_key": "lk2:dca882cef3238d9abc8423f76b95580f5673e8cc1831877941dc35239d9f31e1",
+      "life": null,
+      "name": "rollup_release",
+      "no_key": null,
+      "no_key_dimension": null
+    },
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.1|nation|@rollup|",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "release": [],
+          "rollup": true
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "nation": {
+            "release": [],
+            "rollup": true
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 2
+      },
+      "label_key": "lk2:b011720625d6bfdc5ce6d04e8b65eca4f190be33c54137780c34fbad4e56ad6e",
+      "life": null,
+      "name": "rollup_release_empty",
+      "no_key": null,
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "release": null,
+          "rollup": true
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "rollup_release_absent",
+      "no_key": "release_absent",
+      "no_key_dimension": "nation"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "release": [
+            "ATL"
+          ],
+          "rollup": 1
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "rollup_not_true",
+      "no_key": "value_malformed",
+      "no_key_dimension": "nation"
+    },
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.1|nation|@rollup|ATL,BDR",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "release": [
+            "ATL",
+            "BDR"
+          ],
+          "rollup": true
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "nation": {
+            "release": [
+              "ATL",
+              "BDR"
+            ],
+            "rollup": true
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 2
+      },
+      "label_key": "lk2:dca882cef3238d9abc8423f76b95580f5673e8cc1831877941dc35239d9f31e1",
+      "life": null,
+      "name": "rollup_over_one_author",
+      "no_key": null,
+      "no_key_dimension": null,
+      "not_key_of": [
+        "single_author_atl_bdr",
+        "single_author_atl_atl_bdr"
+      ]
+    },
+    {
+      "canonical": "lk1|urn:oid:1.3.6.1.4.1.32473.1|nation|ATL|BDR",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": "lk1",
+      "label": {
+        "dims": {
+          "nation": {
+            "author": "ATL",
+            "release": [
+              "BDR"
+            ]
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 1
+      },
+      "label_key": "lk1:9c812fa596395e8e08e2e8f0fce50e799cde5ff6b7d2a48ddc7b44933b9de1cc",
+      "life": null,
+      "name": "single_author_atl_bdr",
+      "no_key": null,
+      "no_key_dimension": null
+    },
+    {
+      "canonical": "lk1|urn:oid:1.3.6.1.4.1.32473.1|nation|ATL|ATL,BDR",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "ATL",
+            "BDR"
+          ]
+        }
+      },
+      "form": "lk1",
+      "label": {
+        "dims": {
+          "nation": {
+            "author": "ATL",
+            "release": [
+              "ATL",
+              "BDR"
+            ]
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 1
+      },
+      "label_key": "lk1:e810d9a944ed19efdbb1dbfde4b8ffaaf46a35665205d8031bfa1f3f2387b8c8",
+      "life": null,
+      "name": "single_author_atl_atl_bdr",
+      "no_key": null,
+      "no_key_dimension": null
+    },
+    {
+      "canonical": "lk1|urn:oid:1.3.6.1.4.1.32473.1|nation|ATL|BDR",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "ATL"
+          ],
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": "lk1",
+      "label": {
+        "dims": {
+          "nation": {
+            "author": "ATL",
+            "release": [
+              "BDR"
+            ]
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 1
+      },
+      "label_key": "lk1:9c812fa596395e8e08e2e8f0fce50e799cde5ff6b7d2a48ddc7b44933b9de1cc",
+      "life": null,
+      "name": "single_author_as_list",
+      "no_key": null,
+      "no_key_dimension": null,
+      "same_key_as": "single_author_atl_bdr"
+    },
+    {
+      "canonical": "lk1|example:policy-1|nation|ATL|BDR",
+      "declaration": "legacy_nation_only",
+      "dims": {
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": "lk1",
+      "label": {
+        "dims": {
+          "nation": {
+            "author": "ATL",
+            "release": [
+              "BDR"
+            ]
+          }
+        },
+        "policy": "example:policy-1",
+        "v": 1
+      },
+      "label_key": "lk1:f02cd2ad668e692dc6ee63b3e98b1c1e7cf4f9397fd7cb56e6132be3edf9aa08",
+      "life": null,
+      "name": "lk1_keeps_key_legacy_policy",
+      "no_key": null,
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "legacy_nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "ATL",
+            "BDR"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "legacy_policy_composite",
+      "no_key": "policy_id_not_urn_oid",
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [],
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "author_empty_no_marker",
+      "no_key": "author_empty",
+      "no_key_dimension": "nation"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": null,
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "author_null_no_marker",
+      "no_key": "author_empty",
+      "no_key_dimension": "nation"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "ATL"
+          ],
+          "release": [
+            "BDR"
+          ],
+          "rollup": true
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "marker_with_author",
+      "no_key": "rollup_with_author",
+      "no_key_dimension": "nation"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [],
+          "release": [
+            "BDR"
+          ],
+          "rollup": true
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "marker_with_empty_author",
+      "no_key": "rollup_with_author",
+      "no_key_dimension": "nation"
+    },
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.2|nation|ATL|BDR|data_rights_holder|",
+      "declaration": "nation_rights",
+      "dims": {
+        "data_rights_holder": [],
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "data_rights_holder": [],
+          "nation": {
+            "author": [
+              "ATL"
+            ],
+            "release": [
+              "BDR"
+            ]
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.2",
+        "v": 2
+      },
+      "label_key": "lk2:4702adc6599f848f08487e83af32cc68be51ac45f333bb9e5e113724b271cefc",
+      "life": null,
+      "name": "second_dim_empty",
+      "no_key": null,
+      "no_key_dimension": null
+    },
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.2|nation|ATL|BDR|data_rights_holder|H1,H2",
+      "declaration": "nation_rights",
+      "dims": {
+        "data_rights_holder": [
+          "H2",
+          "H1"
+        ],
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "data_rights_holder": [
+            "H1",
+            "H2"
+          ],
+          "nation": {
+            "author": [
+              "ATL"
+            ],
+            "release": [
+              "BDR"
+            ]
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.2",
+        "v": 2
+      },
+      "label_key": "lk2:53a851f8a43f92e5329e77e9a5dbb8a246ce78effb9090b5c3edee89e6801c49",
+      "life": null,
+      "name": "second_dim_values",
+      "no_key": null,
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_rights",
+      "dims": {
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "second_dim_missing",
+      "no_key": "dimension_missing",
+      "no_key_dimension": "data_rights_holder"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_rights",
+      "dims": {
+        "data_rights_holder": null,
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "second_dim_null",
+      "no_key": "dimension_missing",
+      "no_key_dimension": "data_rights_holder"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "caveat": [
+          "X"
+        ],
+        "nation": {
+          "author": [
+            "ATL",
+            "BDR"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "dimension_undeclared",
+      "no_key": "dimension_undeclared",
+      "no_key_dimension": "caveat"
+    },
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.3|nation|ATL,BDR|CRD|classification|L2|data_rights_holder|H1",
+      "declaration": "nation_rights_level",
+      "dims": {
+        "classification": "L2",
+        "data_rights_holder": [
+          "H1"
+        ],
+        "nation": {
+          "author": [
+            "ATL",
+            "BDR"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "classification": "L2",
+          "data_rights_holder": [
+            "H1"
+          ],
+          "nation": {
+            "author": [
+              "ATL",
+              "BDR"
+            ],
+            "release": [
+              "CRD"
+            ]
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.3",
+        "v": 2
+      },
+      "label_key": "lk2:dd0c50c526ae0beaded87c0694e77410261123687db2f8100e464f9f2af9b055",
+      "life": null,
+      "name": "hierarchical_level",
+      "no_key": null,
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_rights_level",
+      "dims": {
+        "classification": [
+          "L2"
+        ],
+        "data_rights_holder": [
+          "H1"
+        ],
+        "nation": {
+          "author": [
+            "ATL",
+            "BDR"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "hierarchical_as_list",
+      "no_key": "value_malformed",
+      "no_key_dimension": "classification"
+    },
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.3|nation|@rollup|ATL|classification|L1|data_rights_holder|H1",
+      "declaration": "nation_rights_level",
+      "dims": {
+        "classification": "L1",
+        "data_rights_holder": [
+          "H1"
+        ],
+        "nation": {
+          "release": [
+            "ATL"
+          ],
+          "rollup": true
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "classification": "L1",
+          "data_rights_holder": [
+            "H1"
+          ],
+          "nation": {
+            "release": [
+              "ATL"
+            ],
+            "rollup": true
+          }
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.3",
+        "v": 2
+      },
+      "label_key": "lk2:0a50f81ee1b0fecfbbfb608b1337e919f8c1ef2cdfa1e88e1278b9dfd83260a1",
+      "life": null,
+      "name": "rollup_with_two_dims",
+      "no_key": null,
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_rights",
+      "dims": {
+        "data_rights_holder": [
+          "H|1"
+        ],
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "separator_pipe",
+      "no_key": "value_malformed",
+      "no_key_dimension": "data_rights_holder"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_rights",
+      "dims": {
+        "data_rights_holder": [
+          "H,1"
+        ],
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "separator_comma",
+      "no_key": "value_malformed",
+      "no_key_dimension": "data_rights_holder"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_rights",
+      "dims": {
+        "data_rights_holder": [
+          "H~1"
+        ],
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "separator_tilde",
+      "no_key": "value_malformed",
+      "no_key_dimension": "data_rights_holder"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_rights",
+      "dims": {
+        "data_rights_holder": [
+          "@rollup"
+        ],
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "separator_at",
+      "no_key": "value_malformed",
+      "no_key_dimension": "data_rights_holder"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_rights",
+      "dims": {
+        "data_rights_holder": [
+          ""
+        ],
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "value_empty_string",
+      "no_key": "value_malformed",
+      "no_key_dimension": "data_rights_holder"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_rights",
+      "dims": {
+        "data_rights_holder": [
+          "H111111111111111111111111111111111111111111111111111111111111111"
+        ],
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "value_too_long",
+      "no_key": "value_malformed",
+      "no_key_dimension": "data_rights_holder"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_rights",
+      "dims": {
+        "data_rights_holder": [
+          "H 1"
+        ],
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "value_space",
+      "no_key": "value_malformed",
+      "no_key_dimension": "data_rights_holder"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "ATL",
+            "AT|"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "nation_author_malformed",
+      "no_key": "value_malformed",
+      "no_key_dimension": "nation"
+    },
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.1|nation|ATL,BDR|CRD",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "BDR",
+            "ATL"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "nation": {
+            "author": [
+              "ATL",
+              "BDR"
+            ],
+            "release": [
+              "CRD"
+            ]
+          }
+        },
+        "life": {
+          "CreationDateTime": "2026-11-16T09:30:00Z",
+          "ReviewDateTime": null
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 2
+      },
+      "label_key": "lk2:b4d795eb7f2c949dfbae53b23bd0cc519783dd0cb4c1723b7df9a6167e7c1ada",
+      "life": {
+        "CreationDateTime": "2026-11-16T09:30:00Z",
+        "ReviewDateTime": null
+      },
+      "name": "life_a",
+      "no_key": null,
+      "no_key_dimension": null,
+      "same_key_as": "composite_release"
+    },
+    {
+      "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.1|nation|ATL,BDR|CRD",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "BDR",
+            "ATL"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": "lk2",
+      "label": {
+        "dims": {
+          "nation": {
+            "author": [
+              "ATL",
+              "BDR"
+            ],
+            "release": [
+              "CRD"
+            ]
+          }
+        },
+        "life": {
+          "CreationDateTime": "2026-11-16T10:45:12.250Z",
+          "ReviewDateTime": "2027-11-16T10:45:12.250Z"
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 2
+      },
+      "label_key": "lk2:b4d795eb7f2c949dfbae53b23bd0cc519783dd0cb4c1723b7df9a6167e7c1ada",
+      "life": {
+        "CreationDateTime": "2026-11-16T10:45:12.250Z",
+        "ReviewDateTime": "2027-11-16T10:45:12.250Z"
+      },
+      "name": "life_b",
+      "no_key": null,
+      "no_key_dimension": null,
+      "same_key_as": "life_a"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "BDR",
+            "ATL"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": {
+        "CreationDateTime": "2026-11-16T09:30:00Z",
+        "Extra": "x",
+        "ReviewDateTime": null
+      },
+      "name": "life_extra_member",
+      "no_key": "life_malformed",
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "BDR",
+            "ATL"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": {
+        "CreationDateTime": "2026-11-16T09:30:00Z"
+      },
+      "name": "life_missing_review",
+      "no_key": "life_malformed",
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "BDR",
+            "ATL"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": {
+        "CreationDateTime": "yesterday",
+        "ReviewDateTime": null
+      },
+      "name": "life_bad_time",
+      "no_key": "life_malformed",
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "BDR",
+            "ATL"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": {
+        "CreationDateTime": "2026-11-16T09:30:00+00:00",
+        "ReviewDateTime": null
+      },
+      "name": "life_offset",
+      "no_key": "life_malformed",
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "BDR",
+            "ATL"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": {
+        "CreationDateTime": "2026-11-16T09:30:00z",
+        "ReviewDateTime": null
+      },
+      "name": "life_lowercase_z",
+      "no_key": "life_malformed",
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": [
+            "BDR",
+            "ATL"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": {
+        "CreationDateTime": "2026-02-30T09:30:00Z",
+        "ReviewDateTime": null
+      },
+      "name": "life_feb_30",
+      "no_key": "life_malformed",
+      "no_key_dimension": null
+    },
+    {
+      "canonical": "lk1|urn:oid:1.3.6.1.4.1.32473.1|nation|ATL|BDR",
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": "lk1",
+      "label": {
+        "dims": {
+          "nation": {
+            "author": "ATL",
+            "release": [
+              "BDR"
+            ]
+          }
+        },
+        "life": {
+          "CreationDateTime": "2026-11-16T09:30:00Z",
+          "ReviewDateTime": null
+        },
+        "policy": "urn:oid:1.3.6.1.4.1.32473.1",
+        "v": 1
+      },
+      "label_key": "lk1:9c812fa596395e8e08e2e8f0fce50e799cde5ff6b7d2a48ddc7b44933b9de1cc",
+      "life": {
+        "CreationDateTime": "2026-11-16T09:30:00Z",
+        "ReviewDateTime": null
+      },
+      "name": "life_on_lk1_form",
+      "no_key": null,
+      "no_key_dimension": null,
+      "same_key_as": "single_author_atl_bdr"
+    },
+    {
+      "canonical": "lk1|example:policy-1|nation|ATL|BDR",
+      "declaration": "legacy_nation_only",
+      "dims": {
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": "lk1",
+      "label": {
+        "dims": {
+          "nation": {
+            "author": "ATL",
+            "release": [
+              "BDR"
+            ]
+          }
+        },
+        "life": {
+          "CreationDateTime": "2026-11-16T10:45:12.250Z",
+          "ReviewDateTime": "2027-11-16T10:45:12.250Z"
+        },
+        "policy": "example:policy-1",
+        "v": 1
+      },
+      "label_key": "lk1:f02cd2ad668e692dc6ee63b3e98b1c1e7cf4f9397fd7cb56e6132be3edf9aa08",
+      "life": {
+        "CreationDateTime": "2026-11-16T10:45:12.250Z",
+        "ReviewDateTime": "2027-11-16T10:45:12.250Z"
+      },
+      "name": "life_on_lk1_legacy_policy",
+      "no_key": null,
+      "no_key_dimension": null,
+      "same_key_as": "lk1_keeps_key_legacy_policy"
+    },
+    {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "nation": {
+          "author": "ATL",
+          "release": [
+            "BDR"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": {
+        "CreationDateTime": "2026-11-16T09:30:00Z",
+        "Extra": "x",
+        "ReviewDateTime": null
+      },
+      "name": "life_malformed_on_lk1_form",
+      "no_key": "life_malformed",
+      "no_key_dimension": null
+    },
+    {
+      "canonical": null,
+      "declaration": null,
+      "dims": {
+        "nation": {
+          "author": [
+            "BDR",
+            "ATL"
+          ],
+          "release": [
+            "CRD"
+          ]
+        }
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "no_policy",
+      "no_key": "no_policy",
+      "no_key_dimension": null
+    }
+  ]
+}
