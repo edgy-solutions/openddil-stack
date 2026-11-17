@@ -194,7 +194,10 @@ $fn$;
 
 -- Structure only: an object, a policy id of the lk1 shape, a non-empty array
 -- of dimension objects each with a string name and type and a vocabulary that
--- is an array of strings. has_author is read as true only when JSON true.
+-- is an array of strings. Every dimension must also have a has_author member
+-- that is a JSON boolean, and true only where its type is 'permissive'; absent,
+-- null, a number or a string is refused, as is true on any other type. This
+-- mirrors the library's declaration_from_data.
 CREATE OR REPLACE FUNCTION "public"."lk2_decl_shape_ok"(declaration jsonb)
 RETURNS boolean
 LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE
@@ -219,6 +222,8 @@ BEGIN
         OR jsonb_typeof(e -> 'name') IS DISTINCT FROM 'string'
         OR jsonb_typeof(e -> 'type') IS DISTINCT FROM 'string'
         OR jsonb_typeof(e -> 'vocabulary') IS DISTINCT FROM 'array'
+        OR jsonb_typeof(e -> 'has_author') IS DISTINCT FROM 'boolean'
+        OR (e -> 'has_author' = 'true'::jsonb AND (e ->> 'type') <> 'permissive')
         OR EXISTS (
           SELECT 1
             FROM jsonb_array_elements(
@@ -233,7 +238,7 @@ $fn$;
 
 -- _check_keys: NULL when dims is an object with no undeclared key and every
 -- declared dimension present and not null; else the no-key result. Of several
--- undeclared keys the first in "C" order is named.
+-- undeclared keys the first in "C" (byte) order is named, as in the library.
 CREATE OR REPLACE FUNCTION "public"."lk2_check_keys"(dims jsonb, declared text[], others text[])
 RETURNS jsonb
 LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE

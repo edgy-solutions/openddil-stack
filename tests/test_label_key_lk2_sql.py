@@ -9,8 +9,8 @@ because both are tested against one vector table, not because one was ported
 from the other.
 
 Vectors: tests/vectors/lk2.json is a byte-identical copy of the contracts
-repo's lib/python/openddil_labels/vectors/lk2.json at f57d316, pinned here by
-sha256. Its 46 vectors, 11 policy_id cases and 4 declarations are the contract.
+repo's lib/python/openddil_labels/vectors/lk2.json at 3a6a204, pinned here by
+sha256. Its 47 vectors, 11 policy_id cases and 4 declarations are the contract.
 
 What runs where:
   * The structural tests need nothing: the vector pin and shape, and the
@@ -49,7 +49,7 @@ LK1_MIGRATION = MIGRATIONS / "20261115000000_label_key_lk1_function.sql"
 MIGRATION = MIGRATIONS / "20261117000000_label_key_lk2_function.sql"
 VECTORS = Path(__file__).parent / "vectors" / "lk2.json"
 LK1_VECTORS = Path(__file__).parent / "vectors" / "lk1.json"
-VECTORS_SHA256 = "270eae550b82885be4372ed7036a97b5765f387da9d8ca5710c2760ef1c95a1d"
+VECTORS_SHA256 = "46282ff48e733c1a4f3158539cae977943cb9b32f7f578f4f41d203cc75f5ed7"
 PUBLIC_FUNCTIONS = {"lk2_policy_ok", "lk2_life_ok", "lk2_compile", "label_compile"}
 VECTOR_KEYS = {
     "name", "declaration", "dims", "life", "form", "canonical", "label_key",
@@ -103,8 +103,8 @@ def test_vectors_sha256_pinned():
 def test_vectors_shape():
     data = _data()
     vectors = data["vectors"]
-    assert len(vectors) == 46
-    assert len({v["name"] for v in vectors}) == 46
+    assert len(vectors) == 47
+    assert len({v["name"] for v in vectors}) == 47
     for v in vectors:
         assert set(v.keys()) >= VECTOR_KEYS, v.get("name")
     assert len(data["policy_ids"]) == 11
@@ -244,6 +244,22 @@ GARBAGE = [
      _COMP, None, _NOT_LK2, None),
     ("decl_vocabulary_number", _decl(dimensions=[{"name": "nation", "type": "permissive",
                                                    "vocabulary": [1], "has_author": True}]),
+     _COMP, None, _NOT_LK2, None),
+    ("decl_has_author_absent", _decl(dimensions=[{"name": "nation", "type": "permissive",
+                                                   "vocabulary": ["ATL"]}]),
+     _COMP, None, _NOT_LK2, None),
+    ("decl_has_author_null", _decl(dimensions=[{"name": "nation", "type": "permissive",
+                                                 "vocabulary": ["ATL"], "has_author": None}]),
+     _COMP, None, _NOT_LK2, None),
+    ("decl_has_author_number", _decl(dimensions=[{"name": "nation", "type": "permissive",
+                                                   "vocabulary": ["ATL"], "has_author": 1}]),
+     _COMP, None, _NOT_LK2, None),
+    ("decl_has_author_string", _decl(dimensions=[{"name": "nation", "type": "permissive",
+                                                   "vocabulary": ["ATL"], "has_author": "true"}]),
+     _COMP, None, _NOT_LK2, None),
+    ("decl_has_author_true_on_restrictive",
+     _decl(dimensions=_VALID_DECL["dimensions"] + [{"name": "holder", "type": "restrictive",
+                                                     "vocabulary": ["H1"], "has_author": True}]),
      _COMP, None, _NOT_LK2, None),
     ("dims_empty_array", _VALID_DECL, [], None, ("value_malformed", None), "nation_only"),
     ("dims_string", _VALID_DECL, "x", None, ("value_malformed", None), "nation_only"),

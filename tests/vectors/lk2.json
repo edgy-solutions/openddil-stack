@@ -766,6 +766,37 @@
       "no_key_dimension": "caveat"
     },
     {
+      "canonical": null,
+      "declaration": "nation_only",
+      "dims": {
+        "Caveat": [
+          "X"
+        ],
+        "b": [
+          "X"
+        ],
+        "nation": {
+          "author": [
+            "ATL",
+            "BDR"
+          ],
+          "release": [
+            "CRD"
+          ]
+        },
+        "zz": [
+          "X"
+        ]
+      },
+      "form": null,
+      "label": null,
+      "label_key": null,
+      "life": null,
+      "name": "dimension_undeclared_byte_order",
+      "no_key": "dimension_undeclared",
+      "no_key_dimension": "Caveat"
+    },
+    {
       "canonical": "lk2|urn:oid:1.3.6.1.4.1.32473.3|nation|ATL,BDR|CRD|classification|L2|data_rights_holder|H1",
       "declaration": "nation_rights_level",
       "dims": {
