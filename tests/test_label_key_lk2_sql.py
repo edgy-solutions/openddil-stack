@@ -482,8 +482,9 @@ def test_sql_policy_ok_matches_every_policy_id_case():
     queries.append(("p_sql_null", '"public"."lk2_policy_ok"(NULL::jsonb)'))
     rows = _run_queries(queries)
     for i, c in enumerate(cases):
-        assert rows["p%d" % i] == ("t" if c["accepted"] else "f"), c["policy_id"]
-    assert rows["p_sql_null"] == "f"
+        # _marked casts with ::text, and boolean::text is 'true'/'false' (not psql's t/f).
+        assert rows["p%d" % i] == ("true" if c["accepted"] else "false"), c["policy_id"]
+    assert rows["p_sql_null"] == "false"
 
 
 @requires_pg
@@ -492,8 +493,8 @@ def test_sql_life_ok_table():
     queries.append(("l_sql_null", '"public"."lk2_life_ok"(NULL::jsonb)'))
     rows = _run_queries(queries)
     for i, (life, want) in enumerate(LIFE_CASES):
-        assert rows["l%d" % i] == ("t" if want else "f"), life
-    assert rows["l_sql_null"] == "f"
+        assert rows["l%d" % i] == ("true" if want else "false"), life
+    assert rows["l_sql_null"] == "false"
 
 
 @requires_pg
