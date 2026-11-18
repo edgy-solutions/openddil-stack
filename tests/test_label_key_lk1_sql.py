@@ -1,0 +1,327 @@
+"""
+The lk1 SQL functions, checked against the golden vectors.
+
+schema/migrations/20261115000000_label_key_lk1_function.sql defines the lk1
+canonical form and key (DESIGN-2026-11-06 section 1.2) as pure SQL functions.
+The Python reference (openddil_labels.lk1) lives in the contracts repo; the
+two agree because both are tested against one vector table, not because one
+was ported from the other.
+
+Vectors: tests/vectors/lk1.json is a byte-identical copy of the contracts
+repo's lib/openddil-labels vectors (lib/python/openddil_labels/vectors/lk1.json
+at 0552b81), pinned here by sha256.
+
+What runs where:
+  * The structural tests need nothing: the vector pin and shape, and the
+    migration's text (four functions, IMMUTABLE, the version guard, no
+    DISTINCT inside string_agg).
+  * The postgres tests run only when OPENDDIL_TEST_PG_DSN is set and psql is
+    on PATH; otherwise they skip, and the skip reason names which is missing.
+    They run the migration (without its own BEGIN;/COMMIT; lines) and the
+    vector queries inside BEGIN ... ROLLBACK, so nothing is left in the
+    database.
+
+The release set is sorted in the migration with a subquery, not string_agg
+DISTINCT. DESIGN-2026-11-06 section 1.2 wrote string_agg(DISTINCT x, ','
+ORDER BY x COLLATE "C"), which postgres likely refuses (with DISTINCT, ORDER BY
+expressions must appear in the argument list); the proposed correction puts the
+collation on the argument too. The string_agg tests below confirm both forms
+against a real postgres so the design text can be corrected to what CI shows.
+
+Standard library plus pytest only.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).parent.parent
+MIGRATION = REPO_ROOT / "schema" / "migrations" / "20261115000000_label_key_lk1_function.sql"
+VECTORS = Path(__file__).parent / "vectors" / "lk1.json"
+VECTORS_SHA256 = "f7d8075fb8fd674bad470b737d990c4566dd8d170ffbd3fd86434d300cd5db48"
+VECTOR_KEYS = {
+    "name", "policy_id", "originator_nation", "releasable_to",
+    "canonical", "label_key", "label",
+}
+NULL_MARK = "<NULL>"
+
+
+def _vectors() -> list[dict]:
+    return json.loads(VECTORS.read_text(encoding="utf-8"))
+
+
+def _migration_text() -> str:
+    return MIGRATION.read_text(encoding="utf-8")
+
+
+def _migration_body() -> str:
+    """The migration without its own BEGIN; and COMMIT; lines.
+
+    The file carries its own transaction (Atlas applies with --tx-mode none).
+    The postgres tests wrap it in BEGIN ... ROLLBACK so nothing is left
+    behind; the file's COMMIT would end that transaction early, so the
+    tests run it without those two lines. Its SET LOCAL lines stay and hold
+    for the test's transaction.
+    """
+    lines = _migration_text().split("\n")
+    assert lines.count("BEGIN;") == 1 and lines.count("COMMIT;") == 1
+    return "\n".join(x for x in lines if x not in ("BEGIN;", "COMMIT;"))
+
+
+# ---------------------------------------------------------------------------
+# Postgres-free tests
+# ---------------------------------------------------------------------------
+
+def test_vectors_sha256_pinned():
+    assert hashlib.sha256(VECTORS.read_bytes()).hexdigest() == VECTORS_SHA256
+
+
+def test_vectors_shape():
+    vectors = _vectors()
+    assert len(vectors) == 18
+    assert len({v["name"] for v in vectors}) == 18
+    for v in vectors:
+        assert set(v.keys()) == VECTOR_KEYS, v.get("name")
+
+
+def test_migration_defines_four_functions():
+    names = set(re.findall(r'CREATE OR REPLACE FUNCTION "public"\."(lk1_[a-z_]+)"', _migration_text()))
+    assert names == {"lk1_canonical", "lk1_key", "lk1_label", "lk1_sorted_release"}
+
+
+def test_public_functions_are_immutable():
+    text = _migration_text()
+    for name in ("lk1_canonical", "lk1_key", "lk1_label"):
+        m = re.search(
+            r'CREATE OR REPLACE FUNCTION "public"\."%s"\(.*?\)\s*RETURNS\s+\w+\s+LANGUAGE\s+\w+\s+(\w+)' % name,
+            text,
+            re.S,
+        )
+        assert m is not None, name
+        assert m.group(1) == "IMMUTABLE", name
+
+
+def test_version_guard_present():
+    assert "110000" in _migration_text()
+
+
+def test_own_transaction_with_local_timeouts():
+    # Atlas applies with --tx-mode none, so the file is its own transaction:
+    # BEGIN, then both timeouts as SET LOCAL, before any other statement;
+    # COMMIT as the last statement. squawk: require-lock-timeout,
+    # require-statement-timeout.
+    statements = [
+        x for x in _migration_text().split("\n")
+        if x.strip() and not x.startswith("--")
+    ]
+    assert statements[0] == "BEGIN;"
+    assert re.fullmatch(r"SET LOCAL lock_timeout = '\d+m?s';", statements[1])
+    assert re.fullmatch(r"SET LOCAL statement_timeout = '\d+m?s';", statements[2])
+    assert statements[-1] == "COMMIT;"
+    assert _migration_text().split("\n").count("BEGIN;") == 1
+    assert _migration_text().split("\n").count("COMMIT;") == 1
+
+
+def test_no_distinct_inside_string_agg():
+    assert "string_agg(DISTINCT" not in _migration_text()
+
+
+# ---------------------------------------------------------------------------
+# Postgres tests
+# ---------------------------------------------------------------------------
+
+def _pg_skip_reason() -> str | None:
+    if not os.environ.get("OPENDDIL_TEST_PG_DSN"):
+        return "OPENDDIL_TEST_PG_DSN is not set"
+    if shutil.which("psql") is None:
+        return "psql is not on PATH"
+    return None
+
+
+requires_pg = pytest.mark.skipif(
+    _pg_skip_reason() is not None,
+    reason=_pg_skip_reason() or "",
+)
+
+
+def _lit(value: str | None) -> str:
+    if value is None:
+        return "NULL"
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _arr(values: list | None) -> str:
+    if values is None:
+        return "NULL::text[]"
+    if not values:
+        return "ARRAY[]::text[]"
+    return "ARRAY[" + ", ".join(_lit(x) for x in values) + "]::text[]"
+
+
+def _args(v: dict) -> str:
+    return "%s, %s, %s" % (_lit(v["policy_id"]), _lit(v["originator_nation"]), _arr(v["releasable_to"]))
+
+
+def _run_psql(script: str) -> subprocess.CompletedProcess:
+    dsn = os.environ["OPENDDIL_TEST_PG_DSN"]
+    fd, path = tempfile.mkstemp(suffix=".sql", text=False)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(script.encode("utf-8"))
+        return subprocess.run(
+            ["psql", "-X", "-q", "-A", "-t", "-F", "\t", "-d", dsn, "-f", path],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=60,
+        )
+    finally:
+        os.unlink(path)
+
+
+def _marked(expr: str) -> str:
+    return "coalesce((%s)::text, '%s')" % (expr, NULL_MARK)
+
+
+@requires_pg
+def test_sql_matches_vectors_and_properties():
+    lines = ["\\set ON_ERROR_STOP 1", "BEGIN;", _migration_body().rstrip("\n"), ""]
+    vectors = _vectors()
+    for v in vectors:
+        a = _args(v)
+        lines.append(
+            "SELECT %s, %s, %s, %s;"
+            % (
+                _lit(v["name"]),
+                _marked('"public"."lk1_canonical"(%s)' % a),
+                _marked('"public"."lk1_key"(%s)' % a),
+                _marked('"public"."lk1_label"(%s)' % a),
+            )
+        )
+    p = "'example:policy-1'"
+    lines.append(
+        "SELECT 'prop_order_dupes', \"public\".\"lk1_key\"(%s, 'ATL', ARRAY['BDR', 'ATL']) "
+        "= \"public\".\"lk1_key\"(%s, 'ATL', ARRAY['ATL', 'BDR', 'ATL']);" % (p, p)
+    )
+    lines.append(
+        "SELECT 'prop_empty_vs_absent', \"public\".\"lk1_key\"(%s, 'ATL', ARRAY[]::text[]) "
+        "IS DISTINCT FROM \"public\".\"lk1_key\"(%s, 'ATL', NULL);" % (p, p)
+    )
+    lines.append("ROLLBACK;")
+    proc = _run_psql("\n".join(lines) + "\n")
+    assert proc.returncode == 0, proc.stderr
+
+    rows = {}
+    for line in proc.stdout.splitlines():
+        if not line:
+            continue
+        parts = line.split("\t")
+        rows[parts[0]] = parts[1:]
+
+    for v in vectors:
+        got = rows[v["name"]]
+        assert len(got) == 3, v["name"]
+        canonical, key, label = (None if x == NULL_MARK else x for x in got)
+        assert canonical == v["canonical"], v["name"]
+        assert key == v["label_key"], v["name"]
+        parsed = None if label is None else json.loads(label)
+        assert parsed == v["label"], v["name"]
+
+    assert rows["prop_order_dupes"] == ["t"]
+    assert rows["prop_empty_vs_absent"] == ["t"]
+
+
+@requires_pg
+def test_sql_invalid_policy_id_raises():
+    script = "\n".join(
+        [
+            "\\set ON_ERROR_STOP 1",
+            "BEGIN;",
+            _migration_body().rstrip("\n"),
+            "SELECT \"public\".\"lk1_canonical\"('Bad Policy', 'ATL', NULL);",
+            "ROLLBACK;",
+            "",
+        ]
+    )
+    proc = _run_psql(script)
+    assert proc.returncode != 0
+    assert "lk1: invalid policy_id" in proc.stderr
+
+
+_AGG_CORRECTED = (
+    "coalesce((SELECT string_agg(DISTINCT x COLLATE \"C\", ',' ORDER BY x COLLATE \"C\") "
+    "FROM unnest(%s) AS t(x)), '')"
+)
+
+
+def _tail(canonical: str) -> str:
+    return canonical.split("|", 4)[4]
+
+
+@requires_pg
+def test_sql_string_agg_corrected_form_matches_function_and_vectors():
+    lines = ["\\set ON_ERROR_STOP 1", "BEGIN;", _migration_body().rstrip("\n"), ""]
+    fed = [
+        v for v in _vectors()
+        if v["releasable_to"] is not None and v["canonical"] is not None
+    ]
+    for v in fed:
+        arr = _arr(v["releasable_to"])
+        lines.append(
+            "SELECT %s, %s, %s;"
+            % (
+                _lit(v["name"]),
+                _AGG_CORRECTED % arr,
+                "array_to_string(\"public\".\"lk1_sorted_release\"(%s), ',')" % arr,
+            )
+        )
+    # Byte order and de-duplication, no migration needed.
+    lines.append("SELECT 'byte_order', %s, '';" % (_AGG_CORRECTED % "ARRAY['b','B','a','B']::text[]"))
+    lines.append("ROLLBACK;")
+    proc = _run_psql("\n".join(lines) + "\n")
+    assert proc.returncode == 0, proc.stderr
+
+    rows = {}
+    for line in proc.stdout.splitlines():
+        if not line:
+            continue
+        parts = line.split("\t")
+        rows[parts[0]] = parts[1:]
+
+    assert any(v["releasable_to"] == [] for v in fed)
+    assert any(
+        v["releasable_to"] and v["releasable_to"] != sorted(set(v["releasable_to"]))
+        for v in fed
+    )
+    for v in fed:
+        got = rows[v["name"]]
+        assert len(got) == 2, v["name"]
+        want = _tail(v["canonical"])
+        assert got[0] == want, v["name"]
+        assert got[1] == want, v["name"]
+
+    # Under "C", uppercase sorts before lowercase; a locale collation would not.
+    assert rows["byte_order"][0] == "B,a,b"
+
+
+@requires_pg
+def test_sql_string_agg_design_original_form_is_refused():
+    # ON_ERROR_STOP: without it psql exits 0 after a failed statement in an -f script.
+    proc = _run_psql(
+        "\\set ON_ERROR_STOP 1\n"
+        "SELECT string_agg(DISTINCT x, ',' ORDER BY x COLLATE \"C\") "
+        "FROM unnest(ARRAY['b','a']::text[]) AS t(x);\n"
+    )
+    detail = "exit=%s stdout=%r stderr=%r" % (
+        proc.returncode, proc.stdout[:500], proc.stderr[:500],
+    )
+    assert proc.returncode != 0, detail
+    assert "ORDER BY expressions must appear in argument list" in proc.stderr, detail
