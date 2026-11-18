@@ -15,10 +15,15 @@ name: Schema checks
 #      cross-file consistency (e.g. dropping a column added in a later
 #      migration).
 #
-#   3. Atlas lint — `atlas migrate lint` flags non-additive changes and
-#      other deploy-risk patterns on the latest migration. Advisory.
+#   3. Lint — squawk, the open-source Postgres migration linter, over only
+#      the migrations a pull request adds (against the base branch). Blocking:
+#      a finding in a new migration is fixed in that migration. The
+#      migrations already on main are applied and not edited; what squawk
+#      finds in them is recorded in schema/LINT-BASELINE.md. This replaces
+#      `atlas migrate lint`, which is Atlas Pro only from v0.38 and stopped
+#      before analysing anything on every run here.
 #
-# Postgres versions (the matrix on every job):
+# Postgres versions (the matrix on every job that runs Postgres):
 #   17  the deployment target. Must pass.
 #   15  what the test labs run today (read from the running servers on
 #       2026-11-16: 15.18 and 15.19), so a lab roll is covered too. When the
@@ -146,38 +151,38 @@ jobs:
             --dir file://schema/migrations \
             --dev-url "postgres://ci:ci@localhost:5432/ci?sslmode=disable"
 
-  atlas-lint:
-    name: atlas lint (postgres ${{ matrix.postgres }})
+  squawk:
+    name: squawk (migrations this PR adds)
+    # Lint is static: no database, no Postgres matrix. It has meaning only
+    # against a base branch, so it runs on pull requests.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        postgres: [ "17", "15" ]
-    # Lint surfaces non-additive changes and other deploy-risk patterns
-    # — failures here are advisory (continue-on-error), but the
-    # output is preserved in the action logs so authors see what
-    # they introduced.
-    continue-on-error: true
-    services:
-      postgres:
-        image: postgres:${{ matrix.postgres }}
-        env:
-          POSTGRES_USER: ci
-          POSTGRES_PASSWORD: ci
-          POSTGRES_DB: ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ci -d ci"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
     steps:
+      # Full history, so the base branch is there to diff against.
       - uses: actions/checkout@v4
-      - uses: ariga/setup-atlas@v0
-      - name: atlas migrate lint (latest)
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install squawk
+        run: pip install "squawk-cli==2.70.0"
+      - name: Migrations this PR adds
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          atlas migrate lint \
-            --dir file://schema/migrations \
-            --dev-url "postgres://ci:ci@localhost:5432/ci?sslmode=disable" \
-            --latest 1
+          git diff --name-only --diff-filter=A "origin/$BASE_REF...HEAD" -- 'schema/migrations/*.sql' > added-migrations.txt
+          echo "migrations added against $BASE_REF: $(grep -c . added-migrations.txt || true)"
+          cat added-migrations.txt
+      # --pg-version 15.0: the oldest server in the matrix, so rules that
+      # depend on the version judge for the labs too. No
+      # --assume-in-transaction: Atlas applies with --tx-mode none, so a file
+      # runs in a transaction only when it carries its own BEGIN/COMMIT.
+      - name: squawk
+        run: |
+          mapfile -t added < added-migrations.txt
+          if [ "${#added[@]}" -eq 0 ]; then
+            echo "no migration added; nothing to lint"
+            exit 0
+          fi
+          squawk --pg-version=15.0 "${added[@]}"
