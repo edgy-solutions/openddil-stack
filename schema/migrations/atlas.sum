@@ -1,4 +1,4 @@
-h1:K9ijyN1dki3ZPX70dYjdFvnzEXGqfIvpE9Hr4t8Tct4=
+h1:9bmlxWko68SpX8wbMi0SJy40XCBTzC2+nbXTNbymd+E=
 20260514040446_phase4a_pipeline_tables.sql h1:xGr2G36CM3DuKCB6+75KdwqjuLN/vkHsF3gAClJsV/Q=
 20260514110726_phase4a_cm_manual_discrepancies.sql h1:mHyFISzalKwI/FPYu8L7/UIMSpytue/ryycPRaYPy9M=
 20260514150847_phase4c5_edge_buffer_status.sql h1:a81UFmgUgHpbfYXlRBueSCdWSNQCKzsurmMuFZwpjv0=
@@ -34,5 +34,6 @@ h1:K9ijyN1dki3ZPX70dYjdFvnzEXGqfIvpE9Hr4t8Tct4=
 20261016000000_munition_track_trail.sql h1:uDCc3PHLatUgql0Q/22aof6jxJUzjs+IocrcexbPZeU=
 20261017000000_egress_delivered_events_episode.sql h1:XTthhXLXqTVTJGdfmmYS0q4XQdE8H/NB1BeuPfbxFEA=
 20261031000000_asset_element_state.sql h1:ONNt7bjxn5SeLsWuuk06R8Yxv+Nnj+c212y3m45M0iw=
-20261115000000_label_key_lk1_function.sql h1:P+vkxU0YdqDr0v8IF3Qe99MahwV1MKZ3LfQ5JDHHlzY=
-20261117000000_label_key_lk2_function.sql h1:fsjFBz5Akaf8/QhzgQnliDZ+cTWvPAQAvnfN3FLiSZw=
+20261113000000_failure_episodes.sql h1:gCSjLHaC9UIUnd5Slec9M0Ps3SiqSx20zf+zYuLvY/M=
+20261115000000_label_key_lk1_function.sql h1:Vm4sGKA7Fu83saSYwSuZbG02yulbsnQvbCfig+02jcg=
+20261117000000_label_key_lk2_function.sql h1:Q6RVzevUB1bb3tMyaCW0yXFJatMu05g1oj3+oJ4IjQY=
