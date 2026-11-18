@@ -2339,3 +2339,227 @@ table "asset_fielding" {
     columns = [column.fielded_to]
   }
 }
+
+# -----------------------------------------------------------------------------
+# failure_episodes -- closed manual-discrepancy episodes, projected at the tier
+# -----------------------------------------------------------------------------
+# ADR-0051 first slice, item 2. Carries the ADR-0029 labels and the producing
+# tier (edge_id). No usage-meter columns and no task columns in this increment.
+# -----------------------------------------------------------------------------
+table "failure_episodes" {
+  schema = schema.public
+
+  column "episode_id" {
+    type = text
+    null = false
+  }
+
+  column "detected_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "asset_id" {
+    type = text
+    null = false
+  }
+
+  column "component" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "fault_code" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "cleared_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "cleared_by" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "resolution" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "sources" {
+    type = jsonb
+    null = false
+    default = "[]"
+  }
+
+  column "baseline_id" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "mod_compliance" {
+    type = jsonb
+    null = false
+    default = "[]"
+  }
+
+  column "originator_nation" {
+    type = text
+    null = false
+  }
+
+  # Required, no default; {} only when the record says released to no other
+  # nation (ADR-0029 section 7, ADR-0055 section 1a).
+  column "releasable_to" {
+    type = sql("text[]")
+    null = false
+  }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.2), compiled at write by
+  # the projector with openddil_labels. Both NULL when there is no key.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  column "edge_id" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "region_id" {
+    type = text
+    null = true
+  }
+
+  # sha256 hex of the canonical JSON of the record as first written; a replay
+  # is compared against it and never overwrites.
+  column "body_sha256" {
+    type = text
+    null = false
+  }
+
+  column "updated_at" {
+    type = timestamptz
+    null = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.episode_id, column.detected_at]
+  }
+
+  index "idx_failure_episodes_asset_id" {
+    columns = [column.asset_id]
+  }
+
+  index "idx_failure_episodes_label_key" {
+    columns = [column.label_key]
+  }
+
+  check "failure_episodes_label_key_form" {
+    expr = "label_key IS NULL OR label_key ~ '^lk1:[0-9a-f]{64}$'"
+  }
+
+  check "failure_episodes_label_pair" {
+    expr = "(label_key IS NULL) = (label IS NULL)"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# failure_episodes_withheld -- failure-episode records refused at emit,
+# backfill or projection, kept with their reason (ADR-0055: withheld, not
+# dropped). Never pruned. Operator-only: not published to Electric and not in
+# any PEP read set. edge_id / region_id name the producing tier.
+# -----------------------------------------------------------------------------
+table "failure_episodes_withheld" {
+  schema = schema.public
+
+  column "body_sha256" {
+    type = text
+    null = false
+  }
+
+  column "stage" {
+    type = text
+    null = false
+  }
+
+  column "reason" {
+    type = text
+    null = false
+  }
+
+  column "asset_id" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "episode_id" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "detected_at" {
+    type = timestamptz
+    null = true
+  }
+
+  column "body" {
+    type = jsonb
+    null = false
+  }
+
+  column "edge_id" {
+    type = text
+    null = false
+    default = ""
+  }
+
+  column "region_id" {
+    type = text
+    null = true
+  }
+
+  column "first_seen_at" {
+    type = timestamptz
+    null = false
+    default = sql("now()")
+  }
+
+  column "last_seen_at" {
+    type = timestamptz
+    null = false
+    default = sql("now()")
+  }
+
+  column "times_seen" {
+    type = bigint
+    null = false
+    default = 1
+  }
+
+  primary_key {
+    columns = [column.body_sha256, column.stage, column.reason]
+  }
+
+  index "idx_failure_episodes_withheld_asset_id" {
+    columns = [column.asset_id]
+  }
+}

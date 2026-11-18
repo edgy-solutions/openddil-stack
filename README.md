@@ -99,6 +99,10 @@ For DDIL-safe schema evolution:
 2. **Deploy** — Update HQ processors and Edge SDKs to use the new schema.
 3. **Contract** — Remove old columns/tables from `schema.hcl` once all nodes have migrated.
 
+### Every migration owns its transaction and timeouts
+
+Deployment applies migrations with `--tx-mode none`, so Atlas opens no transaction for a file. Each new file under `schema/migrations/` (older files predate the rule) starts with `BEGIN;`, then `SET LOCAL lock_timeout = '…';` and `SET LOCAL statement_timeout = '…';`, and ends with `COMMIT;`. `SET LOCAL` keeps the timeouts inside that transaction. A test that runs a migration inside its own `BEGIN … ROLLBACK` drops the file's `BEGIN;` and `COMMIT;` lines first. Changing a file means re-hashing `schema/migrations/atlas.sum`.
+
 ## ElectricSQL (Read Path)
 
 Edge clients subscribe to Postgres table changes via the [Shape API](https://electric-sql.com/docs/guides/shapes):
