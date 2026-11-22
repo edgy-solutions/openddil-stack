@@ -43,6 +43,25 @@ def store_dsn_from_env() -> str | None:
     raise SystemExit(2)
 
 
+def tier_from_env() -> str:
+    """ASSET_REGISTRY_TIER: the tier this registry runs at. It becomes
+    asset_identity.minting_tier on every identity the declaration agent mints.
+    Required, with no default: a wrong default would name the wrong minting
+    authority on every row. Unset or blank -> exit non-zero, naming the variable.
+    Called by main() at start, not by Config.from_env: from_env is also the topic
+    loader the produces-manifest test runs under a cleared environment.
+    """
+    tier = os.getenv("ASSET_REGISTRY_TIER", "").strip()
+    if not tier:
+        log.error(
+            "ASSET_REGISTRY_TIER is not set: it names the tier this registry "
+            "runs at and is written as the minting tier of every identity; "
+            "there is no default"
+        )
+        raise SystemExit(2)
+    return tier
+
+
 @dataclass(frozen=True)
 class Config:
     # Kafka brokers the service consumes from + publishes to. Single
@@ -96,6 +115,10 @@ class Config:
     # edge_assignment result wins.
     edge_regions: dict
 
+    # Compacted topic of arrivals declared by a person (ADR-0050). Read on the
+    # registry's own broker (kafka_brokers) by the declaration agent.
+    declaration_topic: str
+
     @classmethod
     def from_env(cls) -> "Config":
         return cls(
@@ -124,6 +147,10 @@ class Config:
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
             edge_regions=_parse_edge_regions(
                 os.getenv("ASSET_REGISTRY_EDGE_REGIONS", "")
+            ),
+            declaration_topic=os.getenv(
+                "ASSET_REGISTRY_DECLARATION_TOPIC",
+                "asset-declarations",
             ),
         )
 

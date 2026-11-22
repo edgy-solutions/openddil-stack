@@ -105,6 +105,8 @@ canonical list.
 | `ASSET_REGISTRY_OUTPUT_TOPIC` | no | `asset-registry-events` | HQ topic for changelog |
 | `ASSET_REGISTRY_REPUBLISH_SECONDS` | no | `300` | Per-asset re-publish interval for unchanged registry events; `0` publishes every observation; negative or non-numeric fails at startup |
 | `EDGE_ASSIGNMENT_CONFIG` | no | `/etc/openddil/edge-assignment/edge-assignment.yaml` | Same path projector uses |
+| `ASSET_REGISTRY_TIER` | yes | — | the tier this registry runs at; written as `asset_identity.minting_tier`. The service refuses to start without it |
+| `ASSET_REGISTRY_DECLARATION_TOPIC` | no | `asset-declarations` | declarations the identity agent reads, on `ASSET_REGISTRY_KAFKA_BROKERS`, in a consumer group of its own |
 | `ASSET_REGISTRY_APP_ID` | no | `asset-registry-service` | Faust App ID prefix |
 | `ASSET_REGISTRY_WEB_PORT` | no | `6070` | Base Faust web port; per-edge apps use port + index |
 | `LOG_LEVEL` | no | `INFO` | Standard Python logging level |

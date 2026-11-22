@@ -18,6 +18,10 @@ Env config (see config.py for defaults):
   ASSET_REGISTRY_REPUBLISH_SECONDS -- default 300. Registry events publish on
                                    change, and again after this many seconds
                                    per asset. 0 = publish every observation.
+  ASSET_REGISTRY_TIER           -- required, no default. The tier this registry
+                                   runs at; written as asset_identity.minting_tier
+  ASSET_REGISTRY_DECLARATION_TOPIC -- default "asset-declarations", read on
+                                   ASSET_REGISTRY_KAFKA_BROKERS by the declaration agent
   EDGE_ASSIGNMENT_CONFIG        -- path to edge-assignment.yaml.
                                    Default /etc/openddil/edge-assignment/edge-assignment.yaml
   LOG_LEVEL                     -- default "INFO"
@@ -37,7 +41,8 @@ import faust
 
 from . import db
 from . import edge_assignment as ea
-from .config import Config
+from .config import Config, tier_from_env
+from .declaration_app import make_declaration_app
 from .registry_app import _HqProducerService, make_edge_app
 
 
@@ -137,6 +142,7 @@ def main() -> int:
         stream=sys.stdout,
     )
 
+    tier = tier_from_env()  # refuses to start without ASSET_REGISTRY_TIER
     cfg = Config.from_env()
 
     edges_spec = os.environ["ASSET_REGISTRY_EDGES"]
@@ -187,6 +193,16 @@ def main() -> int:
             static_region=cfg.edge_regions.get(edge_id),
             republish_seconds=republish_seconds,
         ))
+
+    # The declaration agent: its own App and consumer group, on the registry's own
+    # broker (not an edge's). Port follows the per-edge apps'.
+    apps.append(make_declaration_app(
+        brokers=cfg.kafka_brokers,
+        topic=cfg.declaration_topic,
+        tier=tier,
+        app_id=f"{cfg.app_id}-declarations",
+        web_port=cfg.web_port + len(edges),
+    ))
 
     primary, *secondaries = apps
     worker = faust.Worker(
