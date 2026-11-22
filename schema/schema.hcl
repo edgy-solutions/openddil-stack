@@ -2563,3 +2563,278 @@ table "failure_episodes_withheld" {
     columns = [column.asset_id]
   }
 }
+
+# -----------------------------------------------------------------------------
+# ADR-0056 first increment, store half (DESIGN-2026-11-08 section 1). Written only
+# by the asset registry service. Not served, not in electric_publication, so no
+# labels. The four alias_scheme rows and asset_id_era() are in the migration;
+# asset_registry itself is still not declared here (design section 6).
+# -----------------------------------------------------------------------------
+table "alias_scheme" {
+  schema = schema.public
+
+  column "scheme" {
+    type = text
+    null = false
+  }
+
+  column "owner" {
+    type = text
+    null = false
+  }
+
+  column "value_form" {
+    type = text
+    null = false
+  }
+
+  # The uuid5 namespace of this scheme's lookup keys. Generated once, never
+  # derived from the name.
+  column "namespace" {
+    type = uuid
+    null = false
+  }
+
+  column "registered_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "registered_by" {
+    type = text
+    null = false
+  }
+
+  primary_key {
+    columns = [column.scheme]
+  }
+
+  index "alias_scheme_namespace_key" {
+    unique  = true
+    columns = [column.namespace]
+  }
+}
+
+table "asset_identity" {
+  schema = schema.public
+
+  column "identity" {
+    type = uuid
+    null = false
+  }
+
+  column "minted_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "minting_tier" {
+    type = text
+    null = false
+  }
+
+  column "generator" {
+    type = text
+    null = false
+  }
+
+  column "generator_version" {
+    type = text
+    null = false
+  }
+
+  column "declaration" {
+    type = text
+    null = false
+  }
+
+  primary_key {
+    columns = [column.identity]
+  }
+}
+
+table "asset_alias" {
+  schema = schema.public
+
+  column "scheme" {
+    type = text
+    null = false
+  }
+
+  column "value" {
+    type = text
+    null = false
+  }
+
+  # uuid5(alias_scheme.namespace, value), stored beside the value it came from.
+  column "lookup_key" {
+    type = uuid
+    null = false
+  }
+
+  column "identity" {
+    type = uuid
+    null = false
+  }
+
+  column "authority" {
+    type = text
+    null = false
+  }
+
+  column "valid_from" {
+    type = timestamptz
+    null = false
+  }
+
+  column "valid_to" {
+    type = timestamptz
+    null = true
+  }
+
+  column "declaration" {
+    type = text
+    null = false
+  }
+
+  foreign_key "asset_alias_scheme_fkey" {
+    columns     = [column.scheme]
+    ref_columns = [table.alias_scheme.column.scheme]
+  }
+
+  foreign_key "asset_alias_identity_fkey" {
+    columns     = [column.identity]
+    ref_columns = [table.asset_identity.column.identity]
+  }
+
+  # At most one open alias row per (scheme, lookup_key): what makes
+  # lookup-before-mint atomic.
+  index "asset_alias_open_lookup" {
+    unique  = true
+    columns = [column.scheme, column.lookup_key]
+    where   = "valid_to IS NULL"
+  }
+
+  index "idx_asset_alias_identity" {
+    columns = [column.identity]
+  }
+}
+
+table "asset_binding" {
+  schema = schema.public
+
+  column "asset_id" {
+    type = text
+    null = false
+  }
+
+  column "identity" {
+    type = uuid
+    null = false
+  }
+
+  column "bound_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "bound_by" {
+    type = text
+    null = false
+  }
+
+  column "declaration" {
+    type = text
+    null = false
+  }
+
+  primary_key {
+    columns = [column.asset_id, column.identity]
+  }
+
+  foreign_key "asset_binding_identity_fkey" {
+    columns     = [column.identity]
+    ref_columns = [table.asset_identity.column.identity]
+  }
+
+  index "asset_binding_asset_id" {
+    unique  = true
+    columns = [column.asset_id]
+  }
+}
+
+table "identity_equivalence" {
+  schema = schema.public
+
+  column "survivor" {
+    type = uuid
+    null = false
+  }
+
+  column "merged" {
+    type = uuid
+    null = false
+  }
+
+  column "owner" {
+    type = text
+    null = false
+  }
+
+  column "declared_at" {
+    type = timestamptz
+    null = false
+  }
+
+  column "reason" {
+    type = text
+    null = false
+  }
+
+  column "declaration" {
+    type = text
+    null = false
+  }
+
+  primary_key {
+    columns = [column.merged]
+  }
+
+  foreign_key "identity_equivalence_survivor_fkey" {
+    columns     = [column.survivor]
+    ref_columns = [table.asset_identity.column.identity]
+  }
+
+  foreign_key "identity_equivalence_merged_fkey" {
+    columns     = [column.merged]
+    ref_columns = [table.asset_identity.column.identity]
+  }
+
+  check "identity_equivalence_distinct" {
+    expr = "survivor <> merged"
+  }
+}
+
+table "identity_conflict" {
+  schema = schema.public
+
+  column "declaration" {
+    type = text
+    null = true
+  }
+
+  column "asset_id" {
+    type = text
+    null = true
+  }
+
+  column "identities" {
+    type = sql("uuid[]")
+    null = true
+  }
+
+  column "raised_at" {
+    type = timestamptz
+    null = true
+  }
+}
