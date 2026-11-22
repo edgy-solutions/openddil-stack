@@ -101,12 +101,21 @@ def test_no_usage_meter_or_task_columns():
     assert not re.search(r'"[a-z_]*(rounds|moves|task)[a-z_]*" (text|int|jsonb|timestamptz)', MIGRATION)
 
 
+# The tables this slice may create, plus the six of the asset identity migration
+# (20261122000000, ADR-0056 first increment), a later and separate slice.
+ALLOWED_TABLES = (
+    "failure_episodes", "failure_episodes_withheld",
+    "alias_scheme", "asset_identity", "asset_alias", "asset_binding",
+    "identity_equivalence", "identity_conflict",
+)
+
+
 def slice_violations(sql_texts):
     """Violations of the slice fence over migration texts newer than FLOOR."""
     out = []
     for text in sql_texts:
         for m in re.finditer(r'CREATE\s+TABLE\s+"public"\."(\w+)"', text, re.I):
-            if m.group(1) not in ("failure_episodes", "failure_episodes_withheld"):
+            if m.group(1) not in ALLOWED_TABLES:
                 out.append(f"CREATE TABLE {m.group(1)}")
         if re.search(r'ALTER\s+TABLE\s+"public"\."egress_delivered_events"', text, re.I):
             out.append("ALTER TABLE egress_delivered_events")

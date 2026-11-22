@@ -1,12 +1,28 @@
 name: Tests (asset-registry)
 
-# The produces manifest (produces.yaml) must equal what the asset-registry-service code can write,
-# so a new send site or topic fails here in the PR that adds it.
+# Three things are checked here.
+#
+#   1. The produces manifest (produces.yaml) must equal what the asset-registry-service code can write, so a new send
+#      site or topic fails in the PR that adds it.
+#   2. The whole service test run, including the real-postgres asset identity tests (ADR-0056 first increment). They
+#      read ASSET_REGISTRY_TEST_PG_DSN and apply every migration in schema/migrations to a fresh database. A test that
+#      skips because that variable is unset is a silent pass, so such a skip fails the job. (A skip for another reason,
+#      such as uuid-ossp not being creatable in the test database, is printed by -rs and does not fail it.)
+#   3. No id moves: a pull request may not touch egress/ or asset_cm.py. Every id issued today is a uuid5 over
+#      asset_id (DESIGN-2026-11-08 section 3); an era-2 id is a separate increment.
+#
+# egress/** and **/asset_cm.py are in the trigger paths only so that the guard in 3 runs on a pull request that touches them.
+#
+# Postgres versions: 17 is the deployment target, 15 is what the test labs run (same matrix as schema-checks.yml).
+
 on:
   push:
     branches: [ "main" ]
     paths:
       - "asset-registry-service/**"
+      - "schema/migrations/**"
+      - "egress/**"
+      - "**/asset_cm.py"
       - "produces.yaml"
       - "produces_manifest.py"
       - ".github/workflows/tests-asset-registry.yml"
@@ -14,21 +30,88 @@ on:
     branches: [ "main" ]
     paths:
       - "asset-registry-service/**"
+      - "schema/migrations/**"
+      - "egress/**"
+      - "**/asset_cm.py"
       - "produces.yaml"
       - "produces_manifest.py"
       - ".github/workflows/tests-asset-registry.yml"
 
 jobs:
   pytest:
+    name: pytest (postgres ${{ matrix.postgres }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [ "17", "15" ]
+    # A throwaway database for this job only. The credentials are not a secret: the service exists for the length of
+    # the job and is reachable only from the runner. The tests create their own database on it.
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ASSET_REGISTRY_TEST_PG_DSN: postgresql://ci:ci@localhost:5432/ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      # The test is an AST scan plus config.py (stdlib only), but the component conftest imports db, which needs asyncpg;
-      # the rest of the service dependency tree is not needed.
+      # What the tests import: asyncpg (db.py and the identity store), faust and aiokafka (the existing tests import
+      # registry_app and main), pyyaml (edge_assignment and the manifest), pytest-asyncio (the async tests; the
+      # service's pyproject sets asyncio_mode = auto). The identity store itself needs only asyncpg. These match
+      # the service's pyproject.toml.
       - name: Install
-        run: pip install pytest "pyyaml>=6.0" "asyncpg>=0.28.0"
+        run: pip install pytest pytest-asyncio "pyyaml>=6.0" "asyncpg>=0.28.0" "faust-streaming>=0.10.0" "aiokafka<0.12.0"
       - name: produces manifest equals the code
         run: python -m pytest -q asset-registry-service/src/tests/test_produces_manifest.py
+      - name: Service tests (no DSN skips allowed)
+        working-directory: asset-registry-service
+        run: python -m pytest src/tests -v -rs --junitxml=../pytest-results.xml
+      - name: Fail on a skip that names the DSN
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse("pytest-results.xml").getroot()
+          suites = [root] if root.tag == "testsuite" else list(root.iter("testsuite"))
+          skipped = [
+              (c.get("classname", "") + "::" + c.get("name", ""), s.get("message", ""))
+              for suite in suites for c in suite.iter("testcase") for s in c.findall("skipped")
+          ]
+          for name, why in skipped:
+              print("skipped:", name, "-", why)
+          bad = [n for n, why in skipped if "ASSET_REGISTRY_TEST_PG_DSN" in why]
+          print(f"skipped={len(skipped)}, naming the DSN={len(bad)}")
+          raise SystemExit(1 if bad else 0)
+          PY
+
+  no-id-moves:
+    name: no id moves (egress/ and asset_cm.py untouched)
+    # Meaningful against a base branch only.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      # Full history, so origin/main is there to diff against.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Diff touches neither path
+        run: |
+          git diff --name-only origin/main...HEAD > changed.txt
+          echo "files changed against origin/main: $(grep -c . changed.txt || true)"
+          if grep -E '^egress/|asset_cm\.py$' changed.txt; then
+            echo "::error::a path that issues ids is in this diff (egress/ or asset_cm.py); era-2 ids are a separate increment"
+            exit 1
+          fi
+          echo "neither path is in the diff"
