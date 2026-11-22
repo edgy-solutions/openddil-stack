@@ -116,6 +116,23 @@ table "inventory_items" {
     null = true
   }
 
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_inventory_items_label_key" {
+    columns = [column.label_key]
+  }
 }
 
 # -----------------------------------------------------------------------------
@@ -298,6 +315,24 @@ table "asset_cm_state" {
   primary_key {
     columns = [column.asset_id]
   }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_asset_cm_state_label_key" {
+    columns = [column.label_key]
+  }
 }
 
 # Per-asset logistics severity. Source: topic `asset-logistics-status`, compacted.
@@ -413,6 +448,24 @@ table "asset_logistics_status" {
 
   primary_key {
     columns = [column.asset_id]
+  }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_asset_logistics_status_label_key" {
+    columns = [column.label_key]
   }
 }
 
@@ -609,6 +662,24 @@ table "telemetry_latest_state" {
   check "telemetry_latest_state_posture_status_check" {
     expr = "posture_status IN ('unspecified', 'emplaced', 'march_ordered', 'moving', 'emplacing')"
   }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_telemetry_latest_state_label_key" {
+    columns = [column.label_key]
+  }
 }
 
 # ADR-0044 §4 rollup over telemetry_latest_state's two lifecycle columns.
@@ -765,6 +836,23 @@ table "tactical_events" {
     null = true
   }
 
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_tactical_events_label_key" {
+    columns = [column.label_key]
+  }
 }
 
 # Per-asset rolling-window aggregations. Source: topic `asset-telemetry-windows`,
@@ -863,6 +951,23 @@ table "asset_telemetry_windows" {
     null = true
   }
 
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_asset_telemetry_windows_label_key" {
+    columns = [column.label_key]
+  }
 }
 
 # -----------------------------------------------------------------------------
@@ -1059,6 +1164,24 @@ table "parts_availability" {
 
   primary_key {
     columns = [column.site, column.part_ref]
+  }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_parts_availability_label_key" {
+    columns = [column.label_key]
   }
 }
 
@@ -1318,6 +1441,24 @@ table "asset_capability_state" {
   primary_key {
     columns = [column.asset_id]
   }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_asset_capability_state_label_key" {
+    columns = [column.label_key]
+  }
 }
 
 # Phase 9: asset_element_telemetry -- per-element sub-component telemetry
@@ -1396,6 +1537,24 @@ table "asset_element_telemetry" {
 
   primary_key {
     columns = [column.asset_id]
+  }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_asset_element_telemetry_label_key" {
+    columns = [column.label_key]
   }
 }
 
@@ -1524,6 +1683,24 @@ table "asset_element_state" {
       ops    = text_pattern_ops
     }
   }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_asset_element_state_label_key" {
+    columns = [column.label_key]
+  }
 }
 
 # ADR-0046 v2 s5-6: intake_records -- artifacts returned by a destination
@@ -1585,6 +1762,24 @@ table "intake_records" {
 
   primary_key {
     columns = [column.kind, column.key]
+  }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_intake_records_label_key" {
+    columns = [column.label_key]
   }
 }
 
@@ -1713,6 +1908,24 @@ table "effector_launch" {
   check "effector_launch_terminal_state_check" {
     expr = "terminal_state IN ('entity_impact', 'ground_impact', 'detonated', 'dud', 'other', 'unresolved')"
   }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_effector_launch_label_key" {
+    columns = [column.label_key]
+  }
 }
 
 # One row per supply line of a DIS Resupply Received on topic
@@ -1794,6 +2007,24 @@ table "effector_resupply" {
 
   check "effector_resupply_quantity_check" {
     expr = "quantity >= 0"
+  }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_effector_resupply_label_key" {
+    columns = [column.label_key]
   }
 }
 
@@ -1932,6 +2163,24 @@ table "munition_track" {
 
   check "munition_track_terminal_state_check" {
     expr = "terminal_state IN ('entity_impact', 'ground_impact', 'detonated', 'dud', 'other', 'silent')"
+  }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_munition_track_label_key" {
+    columns = [column.label_key]
   }
 }
 
@@ -2205,6 +2454,24 @@ table "asset_declaration" {
   check "asset_declaration_source_check" {
     expr = "source IN ('declare', 'expect-confirm')"
   }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_asset_declaration_label_key" {
+    columns = [column.label_key]
+  }
 }
 
 table "asset_correlation" {
@@ -2274,6 +2541,24 @@ table "asset_correlation" {
   check "asset_correlation_source_check" {
     expr = "source IN ('declare', 'expect-confirm')"
   }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_asset_correlation_label_key" {
+    columns = [column.label_key]
+  }
 }
 
 table "asset_fielding" {
@@ -2337,6 +2622,24 @@ table "asset_fielding" {
 
   index "idx_asset_fielding_fielded_to" {
     columns = [column.fielded_to]
+  }
+
+  # lk1 label key and body (DESIGN-2026-11-06 section 1.3), set by the
+  # trg_label_key_stamp trigger (migration 20261121000000) at every insert and
+  # update. Both NULL when there is no key. Existing rows stay NULL until
+  # scripts/backfill_label_key.py runs.
+  column "label_key" {
+    type = text
+    null = true
+  }
+
+  column "label" {
+    type = jsonb
+    null = true
+  }
+
+  index "idx_asset_fielding_label_key" {
+    columns = [column.label_key]
   }
 }
 
@@ -2561,5 +2864,75 @@ table "failure_episodes_withheld" {
 
   index "idx_failure_episodes_withheld_asset_id" {
     columns = [column.asset_id]
+  }
+}
+
+# -----------------------------------------------------------------------------
+# label_policy -- the deployment's policy identifier (DESIGN-2026-11-06
+# section 1.1). Created empty; nothing in the store writes it. With no row
+# every label_key is NULL.
+# -----------------------------------------------------------------------------
+table "label_policy" {
+  schema = schema.public
+
+  column "singleton" {
+    type    = boolean
+    null    = false
+    default = true
+  }
+
+  column "policy_id" {
+    type = text
+    null = false
+  }
+
+  column "declared_by" {
+    type = text
+    null = false
+  }
+
+  column "declared_at" {
+    type = timestamptz
+    null = false
+  }
+
+  primary_key {
+    columns = [column.singleton]
+  }
+
+  check "label_policy_singleton_check" {
+    expr = "singleton"
+  }
+
+  check "label_policy_policy_id_check" {
+    expr = "policy_id ~ '^[a-z0-9][a-z0-9:._-]{0,62}$'"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# label_registry -- one row per label key, the label body beside it
+# (DESIGN-2026-11-06 section 1.3). A cache: losing it costs a backfill.
+# -----------------------------------------------------------------------------
+table "label_registry" {
+  schema = schema.public
+
+  column "label_key" {
+    type = text
+    null = false
+  }
+
+  column "label" {
+    type = jsonb
+    null = false
+  }
+
+  column "first_seen" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+
+  primary_key {
+    columns = [column.label_key]
   }
 }
